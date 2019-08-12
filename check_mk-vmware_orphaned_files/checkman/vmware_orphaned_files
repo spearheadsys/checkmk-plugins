@@ -1,0 +1,20 @@
+title: Check for VMware Orphaned Files
+agents: windows
+catalog: os/windows
+license: GPL
+distribution:
+description:
+ This check checks for VMware orpahned files. For more details
+ view the following VMware KB Article ID 1005049
+ You need to install the plugin {find_vmdk_orphaned_files.ps1}
+ into the {plugins} directory of your windows agent.
+
+ The check goes to warning if there any orphaned files.
+ The check will output a list of Datastore / Path / Size / LastModified files.
+
+inventory:
+ One service will be created indiferrently of the existence
+ of an orphaned file or not.
+
+perfdata:
+ None

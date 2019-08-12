@@ -1,0 +1,7 @@
+---
+# file: webservers.yml
+- hosts: webservers
+  vars_files: [roles/common/vars/usersandpsks.yml, roles/omd/vars/main.yml]
+  roles:
+    - common
+    - webservers

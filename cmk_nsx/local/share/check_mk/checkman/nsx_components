@@ -1,0 +1,15 @@
+title: VMWare NSX: Components status
+agents: agent_nsx
+catalog: Miscellaneous
+license: GPL
+distribution: check_mk
+description:
+ This check monitors the status of VMWare NSX Components
+item:
+ The item is composed from the Component Type.
+
+perfdata:
+ none
+inventory:
+ All NSX Components defined will be inventorized. 
+

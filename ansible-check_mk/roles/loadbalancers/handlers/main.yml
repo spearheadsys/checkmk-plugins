@@ -1,0 +1,29 @@
+---
+- name: restart haproxy
+  service: name=haproxy state=restarted
+  tags: haproxy
+
+#la executie scriptul va seta cu -e o noua variabila de genul new_server='    server web2 10.88.88.129:80 check'
+
+- name: add_backend
+  action: 'lineinfile "dest=/etc/haproxy/haproxy.cfg" state=present regexp="{{new_server}}" line="{{new_Server}}"'
+  tags:
+    - add_backend
+
+#la executie scriptul va seta cu -e o noua variabila de genul old_server='    server web2 10.88.88.129:80 check'
+- name: del_backend
+  action: 'lineinfile "dest=/etc/haproxy/haproxy.cfg" state=absent regexp="{{old_server}}" line="{{old_Server}}"'
+  tags:
+    - del_backend
+
+- name: cmk_discovery
+  command: curl 'http://{{ omdhost }}/{{ omdsite }}/check_mk/webapi.py?action=discover_services&_username={{ automationuser }}&_secret={{ autosecret }}&mode=refresh' -d 'request={"hostname":"{{ inventory_hostname }}"}'
+  tags:
+    - check_mk_agent
+    - check_mk_discovery
+
+- name: cmk_apply
+  command: curl 'http://{{ omdhost }}/{{ omdsite }}/check_mk/webapi.py?action=activate_changes&_username={{ automationuser }}&_secret={{ autosecret }}&mode=specific' -d 'request={"sites":["{{ omdsite }}"]}'
+  tags:
+    - check_mk_agent
+    - check_mk_discovery

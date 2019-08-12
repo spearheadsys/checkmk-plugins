@@ -1,0 +1,16 @@
+#!/bin/bash
+# SpearHead Systems george.mocanu@sphs.ro 2015
+# Check_MK plugin for monitoring mysql open_files
+
+# Get mysqld pid number
+mysqlPid=`pidof mysqld`
+
+# Count files currently opened by mysql 
+mysqlOpenFiles=`ls -las /proc/$mysqlPid/fd/ | wc -l`
+
+# Get current open_files_limit value
+mysqlOpenFilesLimit=`cat /proc/$mysqlPid/limits | grep 'Max\ open\ files' | awk '{print $4}'`
+
+# Check output
+echo '<<<mysql_open_files>>>'
+echo 'open_files ' $mysqlOpenFilesLimit ' ' $mysqlOpenFiles

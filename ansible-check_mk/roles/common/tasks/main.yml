@@ -1,0 +1,73 @@
+---
+# file: roles/common/tasks/main.yml
+- name: make sure ntp,epel,etc. are installed
+  yum: pkg={{ item }} state=installed
+  with_items:
+   - ntp
+   - xinetd
+   - epel-release
+   #- screen
+   #- vim-enhanced
+   #- mc
+  tags: packages
+
+- name: add sphs group
+  action: group name=sphs state=present
+
+- name: add our users
+  action: user name={{ item }} groups=sphs state=present append=yes
+  with_items: usersAdd
+  when: item != 'none'
+
+- name: Add SSH public key to user mariusp
+  action: authorized_key user=mariusp key="{{ lookup('file', "../files/ssh_keys/mariusp.pub") }}"
+
+- name: Remove users
+  action: user name={{ item }} state=absent remove=yes
+  with_items: usersDel
+  when: item != 'none'
+
+# Enable sudo for sphs group with no password
+- name: Enable sudo without password for sudo group
+  action: 'lineinfile "dest=/etc/sudoers" state=present regexp="^%sphs ALL" line="%sphs ALL=(ALL) NOPASSWD: ALL"'
+
+- name: install check_mk agent
+  yum: pkg=http://{{ omdhost }}/{{ omdsite }}/check_mk/agents/{{ rpmagent }} state=installed
+  tags:
+    - check_mk_agent
+
+# change to get_uri - do some error checking
+- name: add host to omd
+  uri:
+    method: POST
+    body_format: json
+    url: http://{{omdhost}}/{{omdsite}}/check_mk/webapi.py?action=add_host&_username={{automationuser}}&_secret={{autosecret}}
+    body: 'request={"attributes":{"alias":"{{inventory_hostname}}","ipaddress":"{{ansible_default_ipv4["address"]}}"},"hostname":"{{inventory_hostname}}","folder":"{{folder}}"}'
+  delegate_to: 127.0.0.1
+  tags:
+    - check_mk_agent
+  notify:
+    - cmk_discovery
+    - cmk_apply
+
+- name: cmk_discovery
+  uri:
+    method: POST
+    url: http://{{ omdhost }}/{{ omdsite }}/check_mk/webapi.py?action=discover_services&_username={{ automationuser }}&_secret={{ autosecret }}&mode=refresh
+    body: 'request={"hostname":"{{ inventory_hostname }}"}'
+    body_format: json
+    status_code: 200
+  tags:
+    - check_mk_discovery
+  delegate_to: 127.0.0.1
+
+- name: cmk_apply
+  uri:
+    method: POST
+    url: http://{{ omdhost }}/{{ omdsite }}/check_mk/webapi.py?action=activate_changes&_username={{ automationuser }}&_secret={{ autosecret }}&mode=specific
+    body: request={"sites":["{{ omdsite }}"]}
+    body_format: json
+    status_code: 200
+  tags:
+    - check_mk_apply
+  delegate_to: 127.0.0.1

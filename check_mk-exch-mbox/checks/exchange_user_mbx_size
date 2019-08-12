@@ -1,0 +1,46 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# Author: Marius Pana <mp@sphs.ro>
+# EXAMPLE DATA FROM:
+# fomat: emailaddress size_in_MB
+#<<<exchange_user_mbx_size>>>
+#marius.pana@sphs.ro 177
+#mpana@sphs.ro 81
+
+factory_settings["exchange_user_mbx_size_default_values"] = {
+        "levels" : (1500, 2000),
+}
+
+def inventory_exchange_user_mbx_size(info):
+    inventory = []
+    for line in info:
+        useremail = line[0]
+        mailboxsize = line[1]
+        inventory.append((useremail, {} ))
+    return inventory
+
+def check_exchange_user_mbx_size(item, params, info):
+    if type(params) != dict:
+        params = { "levels" : params }
+    #unpack check params
+    warn, crit = params["levels"]
+    for line in info:
+        if line[0] == item:
+            mailboxsize = int(line[1])
+            perfdata = [ ( "size", str(mailboxsize), warn, crit  )  ]
+            if mailboxsize > crit:
+                return (2, "Mailbox size is %dMB" % mailboxsize, perfdata)
+            elif mailboxsize > warn:
+                return (1, "Mailbox size is %dMB" % mailboxsize, perfdata)
+            else:
+                return (0, "Mailbox size is %dMB" % mailboxsize, perfdata)
+    return(3, "Mailbox %s not found in agent output" % item)
+
+check_info["exchange_user_mbx_size"] = {
+    'check_function':        check_exchange_user_mbx_size,
+    'inventory_function':    inventory_exchange_user_mbx_size,
+    'service_description':   '%s Mailbox size',
+    'default_levels_variable': 'exchange_user_mbx_size_default_values',
+    'has_perfdata':          True,
+    'group':                 'exchange_user_mbx_size',
+}

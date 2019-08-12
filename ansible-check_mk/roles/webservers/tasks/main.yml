@@ -1,0 +1,36 @@
+---
+- name: make sure httpd is installed
+  yum: name=httpd state=latest
+  tags: httpd
+
+- name: enable httpd
+  service: name=httpd enabled=yes state=started
+  tags:
+    - httpd
+
+- name: enable http status
+  copy: src=../files/status.conf.j2 dest=/etc/httpd/conf.d/status.conf backup=yes mode=0644
+  notify:
+    - restart httpd
+  tags:
+    - http_status
+    - cmk_discovery
+    - cmk_apply
+
+- name: add apache_status plugin
+  get_url: url=http://{{ omdhost }}/{{ omdsite }}/check_mk/agents/plugins/apache_status dest=/usr/lib/check_mk_agent/plugins/apache_status mode=0755
+  tags:
+    - apache_status
+  notify:
+    - cmk_discovery
+    - cmk_apply
+
+- name: copy images to sites
+  copy: src=../files/konf.jpg dest=/var/www/html/ mode=0644
+  tags:
+    - webcontent
+
+- name: copy index.html to sites
+  template: src=../templates/index.html.j2 dest=/var/www/html/index.html mode=0644
+  tags:
+    - webcontent

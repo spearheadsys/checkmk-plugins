@@ -1,0 +1,7 @@
+---
+automationuser: "automaton"
+autosecret: "GUVKRNECLRGFBTQJCRFY"
+omdhost: "10.88.88.150"
+#omdhost: "192.168.217.129"
+omdsite: "prod"
+rpmagent: "check-mk-agent-1.2.7i3p1-1.noarch.rpm"

@@ -1,0 +1,27 @@
+---
+# file: roles/common/tasks/main.yml
+# we need omd host/site from omd role
+- include_vars: roles/omd/vars/main.yml
+
+- name: make sure epel is installed
+  yum: pkg={{ item }} state=installed
+  with_items:
+   - epel-release
+  tags: packages
+
+- name: upload omd package
+  copy: src=roles/omd/files/check-mk-enterprise-1.2.7i3p1-el6-36.x86_64.rpm dest=/tmp
+
+- name: install omd server
+  yum: name=/tmp/check-mk-enterprise-1.2.7i3p1-el6-36.x86_64.rpm state=present
+
+# might be nice to create ansible module for omd
+- name: create prod instance
+  command: /usr/bin/omd create prod
+  tags:
+    - omdcreate
+
+- name: start our prod instance
+  command: /usr/bin/omd start prod
+  tags:
+    - omdstart

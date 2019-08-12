@@ -1,0 +1,57 @@
+#!/usr/bin/python
+# Author: George Mocanu <george.mocanu@sphs.ro>
+# SpearHead Systems
+
+# EXAMPLE DATA FROM: 
+# fomat: Win2k8_Pack_Name No_of_Installed_Licenses No_of_Used_Licenses
+#
+#<<<rds_licenses>>>
+#Win2k8_Pack_Name 20 15
+
+factory_settings["rds_licenses_default_values"] = {
+        "levels": (80, 90),
+}
+
+def inventory_rds_licenses(info):
+    inventory = []
+    for line in info:
+        checkName = line[0]
+        inventory.append( (checkName, {} ) )
+    return inventory
+
+
+def check_rds_licenses(item, params, info):
+    if type(params) != dict:
+        params = { "levels": params }
+    warn, crit = params["levels"]
+    for line in info:
+        if line[0] == item:
+            total = int(line[1])
+            used = int(line[2])
+            if total != 0:
+                usedPerc = int(((used*100)/total))
+            else:
+                usedPerc = int(((used*100)/1))
+            perfdata = [ ( "usage", usedPerc, warn, crit ) ]
+            if total != 0:
+                if usedPerc > crit:
+                    return (2, "License use level: %d percents. %d licenses used out of %d installed." %(usedPerc, used, total), perfdata)
+                elif usedPerc > warn:
+                    return (1, "License use level: %d percents. %d licenses used out of %d installed." %(usedPerc, used, total), perfdata)
+                else:
+                    return (0, "License use level: %d percents. %d licenses used out of %d installed." %(usedPerc, used, total), perfdata)
+	    else:
+		if used == 0:
+                        return (0, "No licenses installed, none used", perfdata)
+                else:
+                        return (2, "No licenses installed, %d licenses used" %used, perfdata)
+    return(3, "Plugin not running on host")
+
+check_info["rds_licenses"] = {
+    "check_function"		:check_rds_licenses,
+    "inventory_function"	:inventory_rds_licenses,
+    "service_description"	:"%s",
+    "default_levels_variable"	:"rds_licenses_default_values",
+    "has_perfdata"		:True,
+    "group"			:"rds_licenses",
+}

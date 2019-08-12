@@ -1,0 +1,15 @@
+---
+# file: roles/common/handlers/main.yml
+- name: restart ntp
+  service: name=ntp state=restarted
+  tags:
+    - ntpd
+
+- name: restart xinetd
+  service: name=xinetd state=restarted
+  tags: xinetd
+
+- name: restart sshd
+  service: name=sshd state=restarted
+  tags:
+    - sshd

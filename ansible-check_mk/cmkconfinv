@@ -1,0 +1,9 @@
+[loadbalancers]
+lb01 ansible_ssh_host=10.88.88.127 folder=loadbalancers
+
+[webservers]
+web1 ansible_ssh_host=10.88.88.128 folder=webservers
+web2 ansible_ssh_host=10.88.88.129 folder=webservers
+
+[omd]
+omd ansible_ssh_host=10.88.88.150 folder=omd

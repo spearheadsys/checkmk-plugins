@@ -1,0 +1,22 @@
+---
+- name: make sure haproxy and socat is installed
+  yum: name={{ item}} state=latest
+  with_items:
+    - socat
+    - haproxy
+  tags: packages
+
+- name: copy haproxy configuration files
+  copy: src=../files/haproxy.cfg.j2 dest=/etc/haproxy/haproxy.cfg backup=yes mode=0644
+  notify:
+    - restart haproxy
+
+- name: deploy ha_check.sh (autoscale)
+  copy: src=../files/check_ha.sh dest=/usr/lib/check_mk_agent/plugins/check_sa.sh mode=755
+  tags: check_sa
+  notify:
+    - cmk_discovery
+    - cmk_apply
+
+- name: enable haproxy
+  service: name=haproxy enabled=yes state=started

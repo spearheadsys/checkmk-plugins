@@ -1,0 +1,11 @@
+#!/usr/bin/env python
+
+def bake_nfsiostat(opsys, conf, conf_dir, plugins_dir):
+    source = cmk.paths.local_agents_dir + "/plugins/mk_nfsiostat"
+    dest = plugins_dir + "/mk_nfsiostat"
+    shutil.copy2(source, dest)
+
+bakery_info["mk_nfsiostat"] = {
+    "bake_function" : bake_nfsiostat,
+    "os"            : [ "linux", ],
+}

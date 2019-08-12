@@ -1,0 +1,1440 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2018             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# tails. You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+import re
+import sys, getopt
+import requests
+import xml.etree.ElementTree as ET
+from requests.packages.urllib3.exceptions import InsecureRequestWarning # pylint: disable=import-error
+
+def usage():
+    sys.stderr.write("""Check_MK VMWare NSX
+
+USAGE: agent_nsx [OPTIONS] HOST
+
+OPTIONS:
+  -h, --help                    Show this help message and exit
+  --address                     Host address
+  --user                        Username
+  --password                    Password
+  --no-cert-check               Disable certificate check
+  --nsx_resource                List of nsx resources
+""")
+    sys.exit(1)
+
+short_options = "h"
+long_options  = ["help", "username=", "password=", "address=", "demo", "no-cert-check" , "nsx_resource="]
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], short_options, long_options)
+except getopt.GetoptError, err:
+    sys.stderr.write("%s\n" % err)
+    sys.exit(1)
+
+
+opt_demo = False
+opt_cert = True
+args_dict = {}
+resources = []
+
+for o,a in opts:
+    if o in [ "--address" ]:
+        args_dict["address"] = a
+    elif o in [ "--username" ]:
+        args_dict["username"] = a
+    elif o in [ "--password" ]:
+        args_dict["password"] = a
+    elif o in [ "--demo" ]:
+        opt_demo = True
+    elif o in [ "--no-cert-check" ]:
+        opt_cert = False
+    elif o in [ "--nsx_resource"]:
+        resources.append(a)
+    elif o in [ "-h", "--help" ]:
+        usage()
+
+def query(url):
+    if opt_cert == False:
+        requests.packages.urllib3.disable_warnings(InsecureRequestWarning) # pylint: disable=no-member
+    response     = requests.get(url, verify=opt_cert, auth=(args_dict["username"], args_dict["password"]), headers={'Accept':'application/xml'})
+    raw_xml      = response.text
+    # Remove namespace nonsense
+    if "uptime" in str(url):
+        return raw_xml
+    else:
+        raw_xml      = re.sub(' xml="[^"]+"', '', raw_xml, count=1)
+        xml_instance = ET.fromstring(raw_xml)
+        return xml_instance
+
+output_lines = []
+def output(line):
+    output_lines.append(line)
+
+def process_edge_info():
+    output("<<<nsx_edges:sep(9)>>>")
+    xml_instance = query_edges()
+    if xml_instance.iter('edgeSummary'):
+        tbody = xml_instance.iter('edgeSummary')
+        for child in tbody:
+            name=child.find('name').text
+            edgeid=child.find('id').text
+	    edgestatus=child.find('edgeStatus').text
+	    edgestate=child.find('state').text
+	    edgetype=child.find('edgeType').text 
+            output("%s\t%s\t%s\t%s\t%s" % (name, edgeid, edgestatus, edgestate, edgetype))
+
+def process_controller_info():
+    output("<<<nsx_controller:sep(9)>>>")
+    xml_instance = query_controllers()
+    if xml_instance.iter('controller'):
+        tbody = xml_instance.iter('controller')
+        for child in tbody:
+            name=child.find('name').text
+            controllerid=child.find('id').text
+            controllerstatus=child.find('status').text
+            output("%s\t%s\t%s" % (name, controllerid, controllerstatus))
+
+def process_nsx_components_info():
+    output("<<<nsx_components:sep(9)>>>")
+    xml_instance = query_nsx_components()
+    if xml_instance.iter('component'):
+        tbody = xml_instance.iter('component')
+        for child in tbody:
+            component_name=child.find('name').text
+            component_id=child.find('componentId').text
+	    component_status=child.find('status').text
+            output("%s\t%s\t%s" % (component_name, component_id, component_status))
+
+def process_nsx_backup_info():
+    output("<<<nsx_backup:sep(9)>>>")
+    xml_instance = query_nsx_backup()
+    if xml_instance.iter('backupFileProperties'):
+        tbody = xml_instance.iter('backupFileProperties')
+        for child in tbody:
+	    backup_file = child.find('fileName').text
+            backup_size = child.find('fileSize').text
+            backup_creationtime=child.find('creationTime').text
+            output("%s\t%s\t%s" % (backup_file, backup_size, backup_creationtime))
+
+def process_nsx_cpu():
+    output("<<<nsx_cpu>>>")
+    xml_instance = query_nsx_cpu()
+    if xml_instance.iter('cpuinfo'):
+        tbody = xml_instance.iter('cpuInfo')
+        for child in tbody:
+            totalNoOfCPUs = child.find('totalNoOfCPUs').text
+            capacity = child.find('capacity').text
+            usedCapacity=child.find('usedCapacity').text
+            freeCapacity = child.find('freeCapacity').text
+	    usedPercentage = child.find('usedPercentage').text
+            output("totalNoOfCPUs %s\ncapacity %s\nusedCapacity %s\nfreeCapacity %s\nusedPercentage %s" % (totalNoOfCPUs, capacity, usedCapacity, usedCapacity, usedPercentage ))
+
+def process_nsx_memory():
+    output("<<<nsx_memory>>>")
+    xml_instance = query_nsx_memory()
+    if xml_instance.iter('memInfo'):
+        tbody = xml_instance.iter('memInfo')
+        for child in tbody:
+            totalMemory = child.find('totalMemory').text
+            usedMemory = child.find('usedMemory').text
+            freeMemory=child.find('freeMemory').text
+            usedPercentage = child.find('usedPercentage').text
+            output("TotalMem %s\nUsedMemory %s\nFreeMemory %s\nUsedPercentage %s" % (totalMemory, usedMemory, freeMemory, usedPercentage))
+
+def process_nsx_uptime():
+    output("<<<uptime>>>")
+    seconds = 0
+    uptime=query_nsx_uptime()
+    raw_text=uptime.split()
+    uptime=[]
+    for word in raw_text:
+        element = re.sub(',','',word,count =1)
+        uptime.append(element)
+    if "year" in uptime:
+        seconds = int(31536000) * int(uptime[int(uptime.index("year"))-1])
+    if "days" in uptime:
+        seconds += int(86400) * int(uptime[int(uptime.index("days"))-1])
+    if "hours" in uptime:
+        seconds += int(3600) * int(uptime[int(uptime.index("hours"))-1])
+    if "minutes" in uptime:
+        seconds += int(60) * int(uptime[int(uptime.index("minutes"))-1])
+    output(str(seconds))
+
+def process_nsx_vcenter_connection():
+    output("<<<nsx_vcenter_connection>>>")
+    xml_instance = query_nsx_vcenter_connection()
+    if xml_instance.iter('vcConfigStatus'):
+        tbody = xml_instance.iter('vcConfigStatus')
+        for child in tbody:
+            connected = child.find('connected').text
+            output("vCenterConnection %s" % (connected))
+
+def process_nsx_storage_info():
+    output("<<<nsx_storage_info>>>")
+    xml_instance = query_nsx_storage_info()
+    if xml_instance.iter('storageInfo'):
+        tbody = xml_instance.iter('storageInfo')
+        for child in tbody:
+            totalStorage = child.find('totalStorage').text
+            usedStorage = child.find('usedStorage').text
+            freeStorage=child.find('freeStorage').text
+            usedPercentage = child.find('usedPercentage').text
+            output("TotalStorage %s\nUsedStorage %s\nFreeStorage %s\nUsedPercentage %s" % (totalStorage, usedStorage, freeStorage, usedPercentage))
+
+def process_nsx_resource_info():
+    output("<<<nsx_resources:sep(9)>>>")
+    for i in range(len(resources)):
+        xml_instance = query_nsx_resources(resources[i])
+        if xml_instance.iter('resourceStatuses'):
+            tbody = xml_instance.iter('resourceStatus')
+            for child in tbody:
+                hostRebootRequired = child.find('hostRebootRequired').text
+                output("%s\thostRebootRequired\t%s" % ( resources[i], hostRebootRequired) )
+                feature_statuses = child.iter('nwFabricFeatureStatus')
+                for feature in feature_statuses:
+                    featureId = feature.find('featureId').text
+                    featurestatus = feature.find('status').text
+                    output("%s\t%s\t%s" % (resources[i], featureId, featurestatus))
+                
+def query_edges():
+    if opt_demo:
+        raw_xml      = re.sub(' xml="[^"]+"', '', edge_status, count=1)
+        return ET.fromstring(edge_status) 
+    url = "https://%(address)s/api/4.0/edges" % args_dict
+    return query(url)
+
+def query_controllers():
+    if opt_demo:
+        raw_xml      = re.sub(' xml="[^"]+"', '', controllers, count=1)
+        return ET.fromstring(controllers)
+    url = "https://%(address)s/api/2.0/vdn/controller" % args_dict
+    return query(url)
+
+def query_nsx_components():
+    if opt_demo:
+        raw_xml      = re.sub(' xml="[^"]+"', '', nsx_components, count=1)
+        return ET.fromstring(nsx_components)
+    url = "https://%(address)s/api/1.0/appliance-management/summary/components" % args_dict
+    return query(url)
+
+def query_nsx_backup():
+    if opt_demo:
+        raw_xml      = re.sub(' xml="[^"]+"', '', backup, count=1)
+        return ET.fromstring(backup)
+    url = "https://%(address)s/api/1.0/appliance-management/backuprestore/backups" % args_dict
+    return query(url)
+
+def query_nsx_memory():
+    if opt_demo:
+        raw_xml      = re.sub(' xml="[^"]+"', '', nsx_memory, count=1)
+        return ET.fromstring(nsx_memory)
+    url = "https://%(address)s/api/1.0/appliance-management/system/meminfo" % args_dict
+    return query(url)
+
+def query_nsx_cpu():
+    if opt_demo:
+        raw_xml      = re.sub(' xml="[^"]+"', '', nsx_cpu, count=1)
+        return ET.fromstring(nsx_cpu)
+    url = "https://%(address)s/api/1.0/appliance-management/system/cpuinfo" % args_dict
+    return query(url)
+
+def query_nsx_uptime():
+    if opt_demo:
+        return nsx_uptime
+    url = "https://%(address)s/api/1.0/appliance-management/system/uptime" % args_dict
+    return query(url)
+
+def query_nsx_vcenter_connection():
+    if opt_demo:
+        raw_xml      = re.sub(' xml="[^"]+"', '', nsx_vcenter_connection, count=1)
+        return ET.fromstring(nsx_vcenter_connection)
+    url = "https://%(address)s/api/2.0/services/vcconfig/status" % args_dict
+    return query(url)
+
+def query_nsx_storage_info():
+    if opt_demo:
+        raw_xml      = re.sub(' xml="[^"]+"', '', nsx_storage_info, count=1)
+        return ET.fromstring(nsx_storage_info)
+    url = "https://%(address)s/api/1.0/appliance-management/system/storageinfo" % args_dict
+    return query(url)
+
+def query_nsx_resources(resource):
+    if opt_demo:
+        raw_xml      = re.sub(' xml="[^"]+"', '', nsx_resource_domain_c7, count=1)
+        return ET.fromstring(nsx_resource_domain_c7)
+    uri = "api/2.0/nwfabric/status?resource=%s" % resource
+    url_1 = "https://%(address)s/" % args_dict
+    url = "%s%s" % (url_1, uri)
+    return query(url)
+
+def main():
+    try:
+        # Get edges info
+        process_edge_info()
+	    # Get Controllers info
+        process_controller_info()
+	    # Get NSX Components
+        process_nsx_components_info()
+	    # Get NSX Backup
+        process_nsx_backup_info()
+	    # Get NSX Memory Usage
+        process_nsx_memory()
+	    # Get NSX CPU Usage
+        process_nsx_cpu()
+	    # Get Uptime
+        process_nsx_uptime()
+	    # Get vCenter Conneciton
+        process_nsx_vcenter_connection()
+	    # Get Storage info
+        process_nsx_storage_info()
+        # get Resources info
+        process_nsx_resource_info()
+        sys.stdout.write("\n".join(output_lines) + "\n")
+    except Exception, e:
+        sys.stderr.write("Connection error: %s" % e)
+        sys.exit(1)
+
+edge_status = \
+"""<?xml version="1.0" encoding="UTF-8"?>
+<pagedEdgeList>
+    <edgePage>
+        <pagingInfo>
+            <pageSize>256</pageSize>
+            <startIndex>0</startIndex>
+            <totalCount>5</totalCount>
+            <sortOrderAscending>true</sortOrderAscending>
+            <sortBy>id</sortBy>
+        </pagingInfo>
+        <edgeSummary>
+            <objectId>edge-1</objectId>
+            <objectTypeName>Edge</objectTypeName>
+            <vsmUuid>42224242-869B-7AA0-5855-FD2C6ADF7451</vsmUuid>
+            <nodeId>feec058e-c396-4c37-96d2-a7169e92622a</nodeId>
+            <revision>17</revision>
+            <type>
+                <typeName>Edge</typeName>
+            </type>
+            <name>clj01psc01</name>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>false</isUniversal>
+            <universalRevision>0</universalRevision>
+            <isUpgradeAvailable>false</isUpgradeAvailable>
+            <id>edge-1</id>
+            <state>deployed</state>
+            <edgeType>gatewayServices</edgeType>
+            <datacenterMoid>datacenter-2</datacenterMoid>
+            <datacenterName>clj01-m01dc</datacenterName>
+            <tenantId>default</tenantId>
+            <apiVersion>4.0</apiVersion>
+            <edgeStatus>GREEN</edgeStatus>
+            <numberOfConnectedVnics>1</numberOfConnectedVnics>
+            <appliancesSummary>
+                <vmVersion>6.3.4</vmVersion>
+                <vmBuildInfo>6.3.4-6795877</vmBuildInfo>
+                <applianceSize>large</applianceSize>
+                <fqdn>clj01psc01.test</fqdn>
+                <numberOfDeployedVms>2</numberOfDeployedVms>
+                <activeVseHaIndex>0</activeVseHaIndex>
+                <vmMoidOfActiveVse>vm-42</vmMoidOfActiveVse>
+                <vmNameOfActiveVse>clj01psc01-0</vmNameOfActiveVse>
+                <hostMoidOfActiveVse>host-21</hostMoidOfActiveVse>
+                <hostNameOfActiveVse>clj01m01esx03.test</hostNameOfActiveVse>
+                <resourcePoolMoidOfActiveVse>resgroup-8</resourcePoolMoidOfActiveVse>
+                <resourcePoolNameOfActiveVse>Resources</resourcePoolNameOfActiveVse>
+                <dataStoreMoidOfActiveVse>datastore-12</dataStoreMoidOfActiveVse>
+                <dataStoreNameOfActiveVse>clj01-m01-ds01</dataStoreNameOfActiveVse>
+                <statusFromVseUpdatedOn>1528198369821</statusFromVseUpdatedOn>
+                <communicationChannel>msgbus-msgbus</communicationChannel>
+                <enableFips>false</enableFips>
+            </appliancesSummary>
+            <hypervisorAssist>false</hypervisorAssist>
+            <allowedActions>
+                <string>Change Log Level</string>
+                <string>Add Edge Appliance</string>
+                <string>Delete Edge Appliance</string>
+                <string>Edit Edge Appliance</string>
+                <string>Edit CLI Credentials</string>
+                <string>Change FIPS mode</string>
+                <string>Change edge appliance size</string>
+                <string>Force Sync</string>
+                <string>Redeploy Edge</string>
+                <string>Change Edge Appliance Core Dump Configuration</string>
+                <string>Enable hypervisorAssist</string>
+                <string>Edit Highavailability</string>
+                <string>Edit Dns</string>
+                <string>Edit Syslog</string>
+                <string>Edit Automatic Rule Generation Settings</string>
+                <string>Disable SSH</string>
+                <string>Download Edge TechSupport Logs</string>
+            </allowedActions>
+        </edgeSummary>
+        <edgeSummary>
+            <objectId>edge-70c025e2-aae0-4801-b0dd-27c07cb6d9ae</objectId>
+            <objectTypeName>Edge</objectTypeName>
+            <vsmUuid>42220EB5-0574-A0A4-031B-1DA658998F9E</vsmUuid>
+            <nodeId>8a3ecfae-a3dd-4558-91b6-7430419e174b</nodeId>
+            <revision>8</revision>
+            <type>
+                <typeName>Edge</typeName>
+            </type>
+            <name>uni01w01dlrbuc01-X_DMZA</name>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>true</isUniversal>
+            <universalRevision>0</universalRevision>
+            <isUpgradeAvailable>false</isUpgradeAvailable>
+            <id>edge-70c025e2-aae0-4801-b0dd-27c07cb6d9ae</id>
+            <state>active</state>
+            <edgeType>distributedRouter</edgeType>
+            <tenantId>default</tenantId>
+            <apiVersion>4.0</apiVersion>
+            <recentJobInfo>
+                <jobId>jobdata-63834</jobId>
+                <status>SUCCESS</status>
+            </recentJobInfo>
+            <edgeStatus>GREY</edgeStatus>
+            <numberOfConnectedVnics>2</numberOfConnectedVnics>
+            <appliancesSummary>
+                <vmVersion>6.3.4</vmVersion>
+                <applianceSize>compact</applianceSize>
+                <fqdn>NSX-edge-70c025e2-aae0-4801-b0dd-27c07cb6d9ae</fqdn>
+                <numberOfDeployedVms>0</numberOfDeployedVms>
+                <enableFips>true</enableFips>
+            </appliancesSummary>
+	</edgeSummary>
+        <edgeSummary>
+            <objectId>edge-2</objectId>
+            <objectTypeName>Edge</objectTypeName>
+            <vsmUuid>42224242-869B-7AA0-5855-FD2C6ADF7451</vsmUuid>
+            <nodeId>feec058e-c396-4c37-96d2-a7169e92622a</nodeId>
+            <revision>21</revision>
+            <type>
+                <typeName>Edge</typeName>
+            </type>
+            <name>clj01m01esg01</name>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>false</isUniversal>
+            <universalRevision>0</universalRevision>
+            <isUpgradeAvailable>false</isUpgradeAvailable>
+            <id>edge-2</id>
+            <state>deployed</state>
+            <edgeType>gatewayServices</edgeType>
+            <datacenterMoid>datacenter-2</datacenterMoid>
+            <datacenterName>clj01-m01dc</datacenterName>
+            <tenantId>default</tenantId>
+            <apiVersion>4.0</apiVersion>
+            <edgeStatus>GREEN</edgeStatus>
+            <numberOfConnectedVnics>3</numberOfConnectedVnics>
+            <appliancesSummary>
+                <vmVersion>6.3.4</vmVersion>
+                <vmBuildInfo>6.3.4-6795877</vmBuildInfo>
+                <applianceSize>large</applianceSize>
+                <fqdn>clj01m01esg01.test</fqdn>
+                <numberOfDeployedVms>1</numberOfDeployedVms>
+                <activeVseHaIndex>0</activeVseHaIndex>
+                <vmMoidOfActiveVse>vm-46</vmMoidOfActiveVse>
+                <vmNameOfActiveVse>clj01m01esg01-0</vmNameOfActiveVse>
+                <hostMoidOfActiveVse>host-10</hostMoidOfActiveVse>
+                <hostNameOfActiveVse>clj01m01esx01.test</hostNameOfActiveVse>
+                <resourcePoolMoidOfActiveVse>resgroup-8</resourcePoolMoidOfActiveVse>
+                <resourcePoolNameOfActiveVse>Resources</resourcePoolNameOfActiveVse>
+                <dataStoreMoidOfActiveVse>datastore-12</dataStoreMoidOfActiveVse>
+                <dataStoreNameOfActiveVse>clj01-m01-ds01</dataStoreNameOfActiveVse>
+                <statusFromVseUpdatedOn>1528198355972</statusFromVseUpdatedOn>
+                <communicationChannel>msgbus</communicationChannel>
+                <enableFips>false</enableFips>
+            </appliancesSummary>
+            <hypervisorAssist>false</hypervisorAssist>
+            <allowedActions>
+                <string>Change Log Level</string>
+                <string>Add Edge Appliance</string>
+                <string>Delete Edge Appliance</string>
+                <string>Edit Edge Appliance</string>
+                <string>Edit CLI Credentials</string>
+                <string>Change FIPS mode</string>
+                <string>Change edge appliance size</string>
+                <string>Force Sync</string>
+                <string>Redeploy Edge</string>
+                <string>Change Edge Appliance Core Dump Configuration</string>
+                <string>Enable hypervisorAssist</string>
+                <string>Edit Highavailability</string>
+                <string>Edit Dns</string>
+                <string>Edit Syslog</string>
+                <string>Edit Automatic Rule Generation Settings</string>
+                <string>Disable SSH</string>
+                <string>Download Edge TechSupport Logs</string>
+            </allowedActions>
+        </edgeSummary>
+        <edgeSummary>
+            <objectId>edge-3</objectId>
+            <objectTypeName>Edge</objectTypeName>
+            <vsmUuid>42224242-869B-7AA0-5855-FD2C6ADF7451</vsmUuid>
+            <nodeId>feec058e-c396-4c37-96d2-a7169e92622a</nodeId>
+            <revision>15</revision>
+            <type>
+                <typeName>Edge</typeName>
+            </type>
+            <name>clj01m01esg02</name>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>false</isUniversal>
+            <universalRevision>0</universalRevision>
+            <isUpgradeAvailable>false</isUpgradeAvailable>
+            <id>edge-3</id>
+            <state>deployed</state>
+            <edgeType>gatewayServices</edgeType>
+            <datacenterMoid>datacenter-2</datacenterMoid>
+            <datacenterName>clj01-m01dc</datacenterName>
+            <tenantId>default</tenantId>
+            <apiVersion>4.0</apiVersion>
+            <edgeStatus>GREEN</edgeStatus>
+            <numberOfConnectedVnics>3</numberOfConnectedVnics>
+            <appliancesSummary>
+                <vmVersion>6.3.4</vmVersion>
+                <vmBuildInfo>6.3.4-6795877</vmBuildInfo>
+                <applianceSize>large</applianceSize>
+                <fqdn>clj01m01esg02.test</fqdn>
+                <numberOfDeployedVms>1</numberOfDeployedVms>
+                <activeVseHaIndex>0</activeVseHaIndex>
+                <vmMoidOfActiveVse>vm-47</vmMoidOfActiveVse>
+                <vmNameOfActiveVse>clj01m01esg02-0</vmNameOfActiveVse>
+                <hostMoidOfActiveVse>host-20</hostMoidOfActiveVse>
+                <hostNameOfActiveVse>clj01m01esx02.test</hostNameOfActiveVse>
+                <resourcePoolMoidOfActiveVse>resgroup-8</resourcePoolMoidOfActiveVse>
+                <resourcePoolNameOfActiveVse>Resources</resourcePoolNameOfActiveVse>
+                <dataStoreMoidOfActiveVse>datastore-12</dataStoreMoidOfActiveVse>
+                <dataStoreNameOfActiveVse>clj01-m01-ds01</dataStoreNameOfActiveVse>
+                <statusFromVseUpdatedOn>1528198356967</statusFromVseUpdatedOn>
+                <communicationChannel>msgbus</communicationChannel>
+                <enableFips>false</enableFips>
+            </appliancesSummary>
+            <hypervisorAssist>false</hypervisorAssist>
+            <allowedActions>
+                <string>Change Log Level</string>
+                <string>Add Edge Appliance</string>
+                <string>Delete Edge Appliance</string>
+                <string>Edit Edge Appliance</string>
+                <string>Edit CLI Credentials</string>
+                <string>Change FIPS mode</string>
+                <string>Change edge appliance size</string>
+                <string>Force Sync</string>
+                <string>Redeploy Edge</string>
+                <string>Change Edge Appliance Core Dump Configuration</string>
+                <string>Enable hypervisorAssist</string>
+                <string>Edit Highavailability</string>
+                <string>Edit Dns</string>
+                <string>Edit Syslog</string>
+                <string>Edit Automatic Rule Generation Settings</string>
+                <string>Disable SSH</string>
+                <string>Download Edge TechSupport Logs</string>
+            </allowedActions>
+        </edgeSummary>
+        <edgeSummary>
+            <objectId>edge-4</objectId>
+            <objectTypeName>Edge</objectTypeName>
+            <vsmUuid>42224242-869B-7AA0-5855-FD2C6ADF7451</vsmUuid>
+            <nodeId>feec058e-c396-4c37-96d2-a7169e92622a</nodeId>
+            <revision>21</revision>
+            <type>
+                <typeName>Edge</typeName>
+            </type>
+            <name>clj01m01lb01</name>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>false</isUniversal>
+            <universalRevision>0</universalRevision>
+            <isUpgradeAvailable>false</isUpgradeAvailable>
+            <id>edge-4</id>
+            <state>deployed</state>
+            <edgeType>gatewayServices</edgeType>
+            <datacenterMoid>datacenter-2</datacenterMoid>
+            <datacenterName>clj01-m01dc</datacenterName>
+            <tenantId>default</tenantId>
+            <apiVersion>4.0</apiVersion>
+            <recentJobInfo>
+                <jobId>jobdata-25970</jobId>
+                <status>SUCCESS</status>
+            </recentJobInfo>
+            <edgeStatus>GREEN</edgeStatus>
+            <numberOfConnectedVnics>2</numberOfConnectedVnics>
+            <appliancesSummary>
+                <vmVersion>6.3.4</vmVersion>
+                <vmBuildInfo>6.3.4-6795877</vmBuildInfo>
+                <applianceSize>large</applianceSize>
+                <fqdn>clj01m01lb01.test</fqdn>
+                <numberOfDeployedVms>2</numberOfDeployedVms>
+                <activeVseHaIndex>1</activeVseHaIndex>
+                <vmMoidOfActiveVse>vm-68</vmMoidOfActiveVse>
+                <vmNameOfActiveVse>clj01m01lb01-1</vmNameOfActiveVse>
+                <hostMoidOfActiveVse>host-20</hostMoidOfActiveVse>
+                <hostNameOfActiveVse>clj01m01esx02.test</hostNameOfActiveVse>
+                <resourcePoolMoidOfActiveVse>resgroup-8</resourcePoolMoidOfActiveVse>
+                <resourcePoolNameOfActiveVse>Resources</resourcePoolNameOfActiveVse>
+                <dataStoreMoidOfActiveVse>datastore-11</dataStoreMoidOfActiveVse>
+                <dataStoreNameOfActiveVse>clj01-m01-ds03</dataStoreNameOfActiveVse>
+                <statusFromVseUpdatedOn>1528198325165</statusFromVseUpdatedOn>
+                <communicationChannel>msgbus-msgbus</communicationChannel>
+                <enableFips>false</enableFips>
+            </appliancesSummary>
+            <hypervisorAssist>false</hypervisorAssist>
+            <allowedActions>
+                <string>Change Log Level</string>
+                <string>Add Edge Appliance</string>
+                <string>Delete Edge Appliance</string>
+                <string>Edit Edge Appliance</string>
+                <string>Edit CLI Credentials</string>
+                <string>Change FIPS mode</string>
+                <string>Change edge appliance size</string>
+                <string>Force Sync</string>
+                <string>Redeploy Edge</string>
+                <string>Change Edge Appliance Core Dump Configuration</string>
+                <string>Enable hypervisorAssist</string>
+                <string>Edit Highavailability</string>
+                <string>Edit Dns</string>
+                <string>Edit Syslog</string>
+                <string>Edit Automatic Rule Generation Settings</string>
+                <string>Disable SSH</string>
+                <string>Download Edge TechSupport Logs</string>
+            </allowedActions>
+        </edgeSummary>
+        <edgeSummary>
+            <objectId>edge-2c8970e8-14f4-40f1-a684-9971976b730e</objectId>
+            <objectTypeName>Edge</objectTypeName>
+            <vsmUuid>42224242-869B-7AA0-5855-FD2C6ADF7451</vsmUuid>
+            <nodeId>feec058e-c396-4c37-96d2-a7169e92622a</nodeId>
+            <revision>13</revision>
+            <type>
+                <typeName>Edge</typeName>
+            </type>
+            <name>buc01m01udlr01</name>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>true</isUniversal>
+            <universalRevision>0</universalRevision>
+            <isUpgradeAvailable>false</isUpgradeAvailable>
+            <id>edge-2c8970e8-14f4-40f1-a684-9971976b730e</id>
+            <state>deployed</state>
+            <edgeType>distributedRouter</edgeType>
+            <tenantId>default</tenantId>
+            <apiVersion>4.0</apiVersion>
+            <recentJobInfo>
+                <jobId>jobdata-25968</jobId>
+                <status>SUCCESS</status>
+            </recentJobInfo>
+            <edgeStatus>GREEN</edgeStatus>
+            <numberOfConnectedVnics>4</numberOfConnectedVnics>
+            <appliancesSummary>
+                <vmVersion>6.3.4</vmVersion>
+                <vmBuildInfo>6.3.4-6795877</vmBuildInfo>
+                <applianceSize>compact</applianceSize>
+                <fqdn>NSX-edge-2c8970e8-14f4-40f1-a684-9971976b730e</fqdn>
+                <numberOfDeployedVms>2</numberOfDeployedVms>
+                <activeVseHaIndex>0</activeVseHaIndex>
+                <vmMoidOfActiveVse>vm-303</vmMoidOfActiveVse>
+                <vmNameOfActiveVse>edge-2c8970e8-14f4-40f1-a684-9971976b730e-0-buc01m01udlr01</vmNameOfActiveVse>
+                <hostMoidOfActiveVse>host-21</hostMoidOfActiveVse>
+                <hostNameOfActiveVse>clj01m01esx03.test</hostNameOfActiveVse>
+                <resourcePoolMoidOfActiveVse>resgroup-8</resourcePoolMoidOfActiveVse>
+                <resourcePoolNameOfActiveVse>Resources</resourcePoolNameOfActiveVse>
+                <dataStoreMoidOfActiveVse>datastore-12</dataStoreMoidOfActiveVse>
+                <dataStoreNameOfActiveVse>clj01-m01-ds01</dataStoreNameOfActiveVse>
+                <statusFromVseUpdatedOn>1528198329144</statusFromVseUpdatedOn>
+                <communicationChannel>msgbus-msgbus</communicationChannel>
+                <enableFips>false</enableFips>
+            </appliancesSummary>
+            <hypervisorAssist>false</hypervisorAssist>
+            <allowedActions>
+                <string>Change Log Level</string>
+                <string>Add Edge Appliance</string>
+                <string>Delete Edge Appliance</string>
+                <string>Edit Edge Appliance</string>
+                <string>Edit CLI Credentials</string>
+                <string>Change FIPS mode</string>
+                <string>Force Sync</string>
+                <string>Redeploy Edge</string>
+                <string>Change Edge Appliance Core Dump Configuration</string>
+                <string>Edit Highavailability</string>
+                <string>Edit Dns</string>
+                <string>Edit Syslog</string>
+                <string>Disable SSH</string>
+                <string>Download Edge TechSupport Logs</string>
+            </allowedActions>
+            <edgeAssistId>30000</edgeAssistId>
+            <edgeAssistInstanceName>default+edge-2c8970e8-14f4-40f1-a684-9971976b730e</edgeAssistInstanceName>
+            <lrouterUuid>ffcbdd18-6397-489c-a94f-19761b811d81</lrouterUuid>
+            <logicalRouterScopes>
+                <logicalRouterScope>
+                    <type>TransportZone</type>
+                    <id>universalvdnscope</id>
+                </logicalRouterScope>
+            </logicalRouterScopes>
+        </edgeSummary>
+    </edgePage>
+</pagedEdgeList>"""
+
+
+controllers = \
+"""<?xml version="1.0" encoding="UTF-8"?>
+<controllers>
+    <controller>
+        <objectTypeName>Controller</objectTypeName>
+        <revision>0</revision>
+        <name>clj01m01nsxc01</name>
+        <description>clj01m01nsxc01</description>
+        <clientHandle></clientHandle>
+        <isUniversal>false</isUniversal>
+        <universalRevision>0</universalRevision>
+        <id>controller-47</id>
+        <ipAddress>172.19.133.51</ipAddress>
+        <status>RUNNING</status>
+        <upgradeStatus>NOT_STARTED</upgradeStatus>
+        <version>6.3.7087288</version>
+        <upgradeAvailable>true</upgradeAvailable>
+        <virtualMachineInfo>
+            <objectId>vm-301</objectId>
+            <objectTypeName>VirtualMachine</objectTypeName>
+            <vsmUuid>42224242-869B-7AA0-5855-FD2C6ADF7451</vsmUuid>
+            <nodeId>feec058e-c396-4c37-96d2-a7169e92622a</nodeId>
+            <revision>7</revision>
+            <type>
+                <typeName>VirtualMachine</typeName>
+            </type>
+            <name>NSX_Controller_70ef8503-f49b-478f-96bb-08cd01bd3558</name>
+            <scope>
+                <id>domain-c7</id>
+                <objectTypeName>ClusterComputeResource</objectTypeName>
+                <name>clj01-m01-mgmt01</name>
+            </scope>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>false</isUniversal>
+            <universalRevision>0</universalRevision>
+        </virtualMachineInfo>
+        <hostInfo>
+            <objectId>host-21</objectId>
+            <objectTypeName>HostSystem</objectTypeName>
+            <vsmUuid>42224242-869B-7AA0-5855-FD2C6ADF7451</vsmUuid>
+            <nodeId>feec058e-c396-4c37-96d2-a7169e92622a</nodeId>
+            <revision>3016</revision>
+            <type>
+                <typeName>HostSystem</typeName>
+            </type>
+            <name>clj01m01esx03.test</name>
+            <scope>
+                <id>domain-c7</id>
+                <objectTypeName>ClusterComputeResource</objectTypeName>
+                <name>clj01-m01-mgmt01</name>
+            </scope>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>false</isUniversal>
+            <universalRevision>0</universalRevision>
+        </hostInfo>
+        <resourcePoolInfo>
+            <objectId>resgroup-8</objectId>
+            <objectTypeName>ResourcePool</objectTypeName>
+            <vsmUuid>42224242-869B-7AA0-5855-FD2C6ADF7451</vsmUuid>
+            <nodeId>feec058e-c396-4c37-96d2-a7169e92622a</nodeId>
+            <revision>153</revision>
+            <type>
+                <typeName>ResourcePool</typeName>
+            </type>
+            <name>Resources</name>
+            <scope>
+                <id>domain-c7</id>
+                <objectTypeName>ClusterComputeResource</objectTypeName>
+                <name>clj01-m01-mgmt01</name>
+            </scope>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>false</isUniversal>
+            <universalRevision>0</universalRevision>
+        </resourcePoolInfo>
+        <clusterInfo>
+            <objectId>domain-c7</objectId>
+            <objectTypeName>ClusterComputeResource</objectTypeName>
+            <vsmUuid>42224242-869B-7AA0-5855-FD2C6ADF7451</vsmUuid>
+            <nodeId>feec058e-c396-4c37-96d2-a7169e92622a</nodeId>
+            <revision>9</revision>
+            <type>
+                <typeName>ClusterComputeResource</typeName>
+            </type>
+            <name>clj01-m01-mgmt01</name>
+            <scope>
+                <id>datacenter-2</id>
+                <objectTypeName>Datacenter</objectTypeName>
+                <name>clj01-m01dc</name>
+            </scope>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>false</isUniversal>
+            <universalRevision>0</universalRevision>
+        </clusterInfo>
+        <managedBy>42224242-869B-7AA0-5855-FD2C6ADF7451</managedBy>
+        <isDiskReadOnly>false</isDiskReadOnly>
+        <datastoreInfo>
+            <objectId>datastore-12</objectId>
+            <objectTypeName>Datastore</objectTypeName>
+            <vsmUuid>42224242-869B-7AA0-5855-FD2C6ADF7451</vsmUuid>
+            <nodeId>feec058e-c396-4c37-96d2-a7169e92622a</nodeId>
+            <revision>2</revision>
+            <type>
+                <typeName>Datastore</typeName>
+            </type>
+            <name>clj01-m01-ds01</name>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>false</isUniversal>
+            <universalRevision>0</universalRevision>
+        </datastoreInfo>
+        <controllerClusterStatus>
+            <controllerPeerConnectivity>
+                <srcControllerId>controller-47</srcControllerId>
+                <srcControllerIp>172.19.133.51</srcControllerIp>
+                <destControllerIp>172.19.133.52</destControllerIp>
+                <isDestActive>true</isDestActive>
+                <pingStatus>SUCCESS</pingStatus>
+                <lastRefreshedAt>1528198790434</lastRefreshedAt>
+            </controllerPeerConnectivity>
+        </controllerClusterStatus>
+        <diskLatencyAlertDetected>FALSE</diskLatencyAlertDetected>
+        <vmStatus>POWERED_ON</vmStatus>
+    </controller>
+    <controller>
+        <objectTypeName>Controller</objectTypeName>
+        <revision>0</revision>
+        <name>clj01m01nsxc01</name>
+        <description>clj01m01nsxc01</description>
+        <clientHandle></clientHandle>
+        <isUniversal>false</isUniversal>
+        <universalRevision>0</universalRevision>
+        <id>controller-48</id>
+        <ipAddress>172.19.133.52</ipAddress>
+        <status>RUNNING</status>
+        <upgradeStatus>NOT_STARTED</upgradeStatus>
+        <version>6.3.7087288</version>
+        <upgradeAvailable>true</upgradeAvailable>
+        <virtualMachineInfo>
+            <objectId>vm-302</objectId>
+            <objectTypeName>VirtualMachine</objectTypeName>
+            <vsmUuid>42224242-869B-7AA0-5855-FD2C6ADF7451</vsmUuid>
+            <nodeId>feec058e-c396-4c37-96d2-a7169e92622a</nodeId>
+            <revision>7</revision>
+            <type>
+                <typeName>VirtualMachine</typeName>
+            </type>
+            <name>NSX_Controller_cdecc3f5-11c5-461f-b6a8-e980dcc83cc4</name>
+            <scope>
+                <id>domain-c7</id>
+                <objectTypeName>ClusterComputeResource</objectTypeName>
+                <name>clj01-m01-mgmt01</name>
+            </scope>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>false</isUniversal>
+            <universalRevision>0</universalRevision>
+        </virtualMachineInfo>
+        <hostInfo>
+            <objectId>host-21</objectId>
+            <objectTypeName>HostSystem</objectTypeName>
+            <vsmUuid>42224242-869B-7AA0-5855-FD2C6ADF7451</vsmUuid>
+            <nodeId>feec058e-c396-4c37-96d2-a7169e92622a</nodeId>
+            <revision>3016</revision>
+            <type>
+                <typeName>HostSystem</typeName>
+            </type>
+            <name>clj01m01esx03.test</name>
+            <scope>
+                <id>domain-c7</id>
+                <objectTypeName>ClusterComputeResource</objectTypeName>
+                <name>clj01-m01-mgmt01</name>
+            </scope>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>false</isUniversal>
+            <universalRevision>0</universalRevision>
+        </hostInfo>
+        <resourcePoolInfo>
+            <objectId>resgroup-8</objectId>
+            <objectTypeName>ResourcePool</objectTypeName>
+            <vsmUuid>42224242-869B-7AA0-5855-FD2C6ADF7451</vsmUuid>
+            <nodeId>feec058e-c396-4c37-96d2-a7169e92622a</nodeId>
+            <revision>153</revision>
+            <type>
+                <typeName>ResourcePool</typeName>
+            </type>
+            <name>Resources</name>
+            <scope>
+                <id>domain-c7</id>
+                <objectTypeName>ClusterComputeResource</objectTypeName>
+                <name>clj01-m01-mgmt01</name>
+            </scope>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>false</isUniversal>
+            <universalRevision>0</universalRevision>
+        </resourcePoolInfo>
+        <clusterInfo>
+            <objectId>domain-c7</objectId>
+            <objectTypeName>ClusterComputeResource</objectTypeName>
+            <vsmUuid>42224242-869B-7AA0-5855-FD2C6ADF7451</vsmUuid>
+            <nodeId>feec058e-c396-4c37-96d2-a7169e92622a</nodeId>
+            <revision>9</revision>
+            <type>
+                <typeName>ClusterComputeResource</typeName>
+            </type>
+            <name>clj01-m01-mgmt01</name>
+            <scope>
+                <id>datacenter-2</id>
+                <objectTypeName>Datacenter</objectTypeName>
+                <name>clj01-m01dc</name>
+            </scope>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>false</isUniversal>
+            <universalRevision>0</universalRevision>
+        </clusterInfo>
+        <managedBy>42224242-869B-7AA0-5855-FD2C6ADF7451</managedBy>
+        <isDiskReadOnly>false</isDiskReadOnly>
+        <datastoreInfo>
+            <objectId>datastore-12</objectId>
+            <objectTypeName>Datastore</objectTypeName>
+            <vsmUuid>42224242-869B-7AA0-5855-FD2C6ADF7451</vsmUuid>
+            <nodeId>feec058e-c396-4c37-96d2-a7169e92622a</nodeId>
+            <revision>2</revision>
+            <type>
+                <typeName>Datastore</typeName>
+            </type>
+            <name>clj01-m01-ds01</name>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>false</isUniversal>
+            <universalRevision>0</universalRevision>
+        </datastoreInfo>
+        <controllerClusterStatus>
+            <controllerPeerConnectivity>
+                <srcControllerId>controller-48</srcControllerId>
+                <srcControllerIp>172.19.133.52</srcControllerIp>
+                <destControllerIp>172.19.133.51</destControllerIp>
+                <isDestActive>true</isDestActive>
+                <pingStatus>SUCCESS</pingStatus>
+                <lastRefreshedAt>1528198790484</lastRefreshedAt>
+            </controllerPeerConnectivity>
+        </controllerClusterStatus>
+        <diskLatencyAlertDetected>FALSE</diskLatencyAlertDetected>
+        <vmStatus>POWERED_ON</vmStatus>
+    </controller>
+</controllers>"""
+
+nsx_components = \
+"""<?xml version="1.0" encoding="UTF-8"?>
+<componentsSummary>
+    <componentsByGroup class="tree-map">
+        <entry>
+            <string>COMMON</string>
+            <components>
+                <component>
+                    <componentId>VPOSTGRES</componentId>
+                    <name>vPostgres</name>
+                    <description>vPostgres - Database service</description>
+                    <status>RUNNING</status>
+                    <enabled>true</enabled>
+                    <showTechSupportLogs>false</showTechSupportLogs>
+                    <usedBy>
+                        <string>NSX</string>
+                    </usedBy>
+                    <componentGroup>COMMON</componentGroup>
+                </component>
+                <component>
+                    <componentId>RABBITMQ</componentId>
+                    <name>RabbitMQ</name>
+                    <description>RabbitMQ - Messaging service</description>
+                    <status>RUNNING</status>
+                    <enabled>true</enabled>
+                    <showTechSupportLogs>false</showTechSupportLogs>
+                    <usedBy>
+                        <string>NSX</string>
+                    </usedBy>
+                    <componentGroup>COMMON</componentGroup>
+                </component>
+            </components>
+        </entry>
+        <entry>
+            <string>NSXGRP</string>
+            <components>
+                <component>
+                    <componentId>NSXREPLICATOR</componentId>
+                    <name>NSX Replicator</name>
+                    <description>NSX Replicator</description>
+                    <status>RUNNING</status>
+                    <enabled>true</enabled>
+                    <showTechSupportLogs>false</showTechSupportLogs>
+                    <uses>
+                        <string>NSX</string>
+                    </uses>
+                    <usedBy/>
+                    <componentGroup>NSXGRP</componentGroup>
+                </component>
+                <component>
+                    <componentId>NSX</componentId>
+                    <name>NSX Manager</name>
+                    <description>NSX Manager</description>
+                    <status>RUNNING</status>
+                    <enabled>true</enabled>
+                    <showTechSupportLogs>true</showTechSupportLogs>
+                    <uses>
+                        <string>VPOSTGRES</string>
+                        <string>RABBITMQ</string>
+                    </uses>
+                    <usedBy>
+                        <string>NSXREPLICATOR</string>
+                    </usedBy>
+                    <componentGroup>NSXGRP</componentGroup>
+                    <versionInfo>
+                        <majorVersion>6</majorVersion>
+                        <minorVersion>3</minorVersion>
+                        <patchVersion>4</patchVersion>
+                        <buildNumber>7087695</buildNumber>
+                    </versionInfo>
+                </component>
+            </components>
+        </entry>
+        <entry>
+            <string>SYSTEM</string>
+            <components>
+                <component>
+                    <componentId>SSH</componentId>
+                    <name>SSH Service</name>
+                    <description>Secure Shell</description>
+                    <status>RUNNING</status>
+                    <enabled>true</enabled>
+                    <showTechSupportLogs>false</showTechSupportLogs>
+                    <usedBy/>
+                    <componentGroup>SYSTEM</componentGroup>
+                </component>
+            </components>
+        </entry>
+    </componentsByGroup>
+</componentsSummary>"""
+
+
+backup = \
+"""<?xml version="1.0" encoding="UTF-8"?>
+<list>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Tue05Jun2018</fileName>
+        <fileSize>3614752</fileSize>
+        <creationTime>1528156800000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Sun03Jun2018</fileName>
+        <fileSize>3553312</fileSize>
+        <creationTime>1527984000000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Sat02Jun2018</fileName>
+        <fileSize>3532832</fileSize>
+        <creationTime>1527897600000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Thu31May2018</fileName>
+        <fileSize>3491872</fileSize>
+        <creationTime>1527724800000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Wed30May2018</fileName>
+        <fileSize>3471392</fileSize>
+        <creationTime>1527638400000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Tue29May2018</fileName>
+        <fileSize>3450912</fileSize>
+        <creationTime>1527552000000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Mon28May2018</fileName>
+        <fileSize>3430432</fileSize>
+        <creationTime>1527465600000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Sun27May2018</fileName>
+        <fileSize>3420192</fileSize>
+        <creationTime>1527379200000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Sat26May2018</fileName>
+        <fileSize>3399712</fileSize>
+        <creationTime>1527292800000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Fri25May2018</fileName>
+        <fileSize>3389472</fileSize>
+        <creationTime>1527206400000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Thu24May2018</fileName>
+        <fileSize>3328032</fileSize>
+        <creationTime>1527120000000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Tue22May2018</fileName>
+        <fileSize>3266592</fileSize>
+        <creationTime>1526947200000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Mon21May2018</fileName>
+        <fileSize>3246112</fileSize>
+        <creationTime>1526860800000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Sun20May2018</fileName>
+        <fileSize>3225632</fileSize>
+        <creationTime>1526774400000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Sat19May2018</fileName>
+        <fileSize>3205152</fileSize>
+        <creationTime>1526688000000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Fri30Mar2018</fileName>
+        <fileSize>2109472</fileSize>
+        <creationTime>1522368000000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Fri18May2018</fileName>
+        <fileSize>3184672</fileSize>
+        <creationTime>1526601600000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Thu29Mar2018</fileName>
+        <fileSize>2088992</fileSize>
+        <creationTime>1522281600000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Thu17May2018</fileName>
+        <fileSize>3153952</fileSize>
+        <creationTime>1526515200000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Wed28Mar2018</fileName>
+        <fileSize>2058272</fileSize>
+        <creationTime>1522195200000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Wed16May2018</fileName>
+        <fileSize>3143712</fileSize>
+        <creationTime>1526428800000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Tue27Mar2018</fileName>
+        <fileSize>2037792</fileSize>
+        <creationTime>1522108800000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_23_59_58_Mon14May2018</fileName>
+        <fileSize>3143712</fileSize>
+        <creationTime>1526342398000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Mon26Mar2018</fileName>
+        <fileSize>2017312</fileSize>
+        <creationTime>1522022400000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Mon14May2018</fileName>
+        <fileSize>3143712</fileSize>
+        <creationTime>1526256000000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Sun25Mar2018</fileName>
+        <fileSize>1996832</fileSize>
+        <creationTime>1521936000000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Sun13May2018</fileName>
+        <fileSize>3112992</fileSize>
+        <creationTime>1526169600000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Sat24Mar2018</fileName>
+        <fileSize>1976352</fileSize>
+        <creationTime>1521849600000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Sat12May2018</fileName>
+        <fileSize>3133472</fileSize>
+        <creationTime>1526083200000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Fri23Mar2018</fileName>
+        <fileSize>1996832</fileSize>
+        <creationTime>1521763200000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Thu22Mar2018</fileName>
+        <fileSize>1914912</fileSize>
+        <creationTime>1521676800000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Thu10May2018</fileName>
+        <fileSize>3072032</fileSize>
+        <creationTime>1525910400000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Wed21Mar2018</fileName>
+        <fileSize>1822752</fileSize>
+        <creationTime>1521590400000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Wed09May2018</fileName>
+        <fileSize>3051552</fileSize>
+        <creationTime>1525824000000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Tue20Mar2018</fileName>
+        <fileSize>1740832</fileSize>
+        <creationTime>1521504000000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Tue08May2018</fileName>
+        <fileSize>2990112</fileSize>
+        <creationTime>1525737600000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Mon19Mar2018</fileName>
+        <fileSize>1658912</fileSize>
+        <creationTime>1521417600000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Mon07May2018</fileName>
+        <fileSize>2928672</fileSize>
+        <creationTime>1525651200000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Sun18Mar2018</fileName>
+        <fileSize>1576992</fileSize>
+        <creationTime>1521331200000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Sun06May2018</fileName>
+        <fileSize>2908192</fileSize>
+        <creationTime>1525564800000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Sat17Mar2018</fileName>
+        <fileSize>1495072</fileSize>
+        <creationTime>1521244800000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Sat05May2018</fileName>
+        <fileSize>2887712</fileSize>
+        <creationTime>1525478400000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Fri16Mar2018</fileName>
+        <fileSize>1402912</fileSize>
+        <creationTime>1521158400000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Fri04May2018</fileName>
+        <fileSize>2867232</fileSize>
+        <creationTime>1525392000000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Thu15Mar2018</fileName>
+        <fileSize>1320992</fileSize>
+        <creationTime>1521072000000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Wed14Mar2018</fileName>
+        <fileSize>1228832</fileSize>
+        <creationTime>1520985600000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Tue13Mar2018</fileName>
+        <fileSize>1146912</fileSize>
+        <creationTime>1520899200000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Mon12Mar2018</fileName>
+        <fileSize>1064992</fileSize>
+        <creationTime>1520812800000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Sun11Mar2018</fileName>
+        <fileSize>993312</fileSize>
+        <creationTime>1520726400000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_23_59_58_Fri09Mar2018</fileName>
+        <fileSize>911392</fileSize>
+        <creationTime>1520639998000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_23_59_58_Thu08Mar2018</fileName>
+        <fileSize>778272</fileSize>
+        <creationTime>1520553598000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Thu08Mar2018</fileName>
+        <fileSize>665632</fileSize>
+        <creationTime>1520467200000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_08_21_01_Wed07Mar2018</fileName>
+        <fileSize>532512</fileSize>
+        <creationTime>1520410861000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Mon04Jun2018</fileName>
+        <fileSize>3573792</fileSize>
+        <creationTime>1528070400000</creationTime>
+    </backupFileProperties>
+    <backupFileProperties>
+        <fileName>clj01m01nsx01_00_00_00_Fri01Jun2018</fileName>
+        <fileSize>3512352</fileSize>
+        <creationTime>1527811200000</creationTime>
+    </backupFileProperties>
+</list>"""
+
+nsx_memory = \
+"""<?xml version="1.0" encoding="UTF-8"?>
+<memInfo>
+    <totalMemory>16025 MB</totalMemory>
+    <usedMemory>5233 MB</usedMemory>
+    <freeMemory>10792 MB</freeMemory>
+    <usedPercentage>33</usedPercentage>
+</memInfo>"""
+
+nsx_cpu = \
+"""<?xml version="1.0" encoding="UTF-8"?>
+<cpuInfo>
+    <totalNoOfCPUs>4</totalNoOfCPUs>
+    <capacity>2196 MHZ</capacity>
+    <usedCapacity>17 MHZ</usedCapacity>
+    <freeCapacity>2179 MHZ</freeCapacity>
+    <usedPercentage>1</usedPercentage>
+</cpuInfo>"""
+
+nsx_vcenter_connection = \
+"""<?xml version="1.0" encoding="UTF-8"?>
+<vcConfigStatus>
+    <connected>true</connected>
+    <lastInventorySyncTime>1528202184756</lastInventorySyncTime>
+</vcConfigStatus>"""
+
+
+nsx_storage_info = \
+"""<?xml version="1.0" encoding="UTF-8"?>
+<storageInfo>
+    <totalStorage>81G</totalStorage>
+    <usedStorage>4.1G</usedStorage>
+    <freeStorage>77G</freeStorage>
+    <usedPercentage>5</usedPercentage>
+</storageInfo>"""
+
+
+nsx_uptime = "7 days, 7 minutes"
+
+nsx_resource_domain_c7 = \
+"""<?xml version="1.0" encoding="UTF-8"?>
+<resourceStatuses>
+    <resourceStatus>
+        <resource>
+            <objectId>domain-c7</objectId>
+            <objectTypeName>ClusterComputeResource</objectTypeName>
+            <vsmUuid>4220F930-D7C1-D623-88EC-FB40297018CF</vsmUuid>
+            <nodeId>b473ae67-65db-48cb-ac8d-069e43df1c52</nodeId>
+            <revision>12</revision>
+            <type>
+                <typeName>ClusterComputeResource</typeName>
+            </type>
+            <name>buc01-m01-mgmt01</name>
+            <scope>
+                <id>datacenter-2</id>
+                <objectTypeName>Datacenter</objectTypeName>
+                <name>buc01-m01dc</name>
+            </scope>
+            <clientHandle></clientHandle>
+            <extendedAttributes/>
+            <isUniversal>false</isUniversal>
+            <universalRevision>0</universalRevision>
+        </resource>
+        <hostRebootRequired>false</hostRebootRequired>
+        <nwFabricFeatureStatus>
+            <featureId>com.vmware.vshield.vsm.nwfabric.hostPrep</featureId>
+            <featureVersion>6.3.4.7087695</featureVersion>
+            <updateAvailable>false</updateAvailable>
+            <status>GREEN</status>
+            <installed>true</installed>
+            <enabled>true</enabled>
+            <allowConfiguration>false</allowConfiguration>
+        </nwFabricFeatureStatus>
+        <nwFabricFeatureStatus>
+            <featureId>com.vmware.vshield.vsm.vdr_mon</featureId>
+            <featureVersion>5.5</featureVersion>
+            <updateAvailable>false</updateAvailable>
+            <status>UNKNOWN</status>
+            <installed>false</installed>
+            <enabled>true</enabled>
+            <allowConfiguration>false</allowConfiguration>
+        </nwFabricFeatureStatus>
+        <nwFabricFeatureStatus>
+            <featureId>com.vmware.vshield.vsm.vxlan</featureId>
+            <featureVersion>5.5</featureVersion>
+            <updateAvailable>false</updateAvailable>
+            <status>GREEN</status>
+            <installed>true</installed>
+            <enabled>true</enabled>
+            <allowConfiguration>false</allowConfiguration>
+        </nwFabricFeatureStatus>
+        <nwFabricFeatureStatus>
+            <featureId>com.vmware.vshield.vsm.messagingInfra</featureId>
+            <updateAvailable>false</updateAvailable>
+            <status>GREEN</status>
+            <installed>true</installed>
+            <enabled>true</enabled>
+            <allowConfiguration>false</allowConfiguration>
+        </nwFabricFeatureStatus>
+        <nwFabricFeatureStatus>
+            <featureId>com.vmware.vshield.firewall</featureId>
+            <featureVersion>5.5</featureVersion>
+            <updateAvailable>false</updateAvailable>
+            <status>GREEN</status>
+            <message></message>
+            <installed>true</installed>
+            <enabled>true</enabled>
+            <allowConfiguration>false</allowConfiguration>
+        </nwFabricFeatureStatus>
+    </resourceStatus>
+</resourceStatuses>"""
+
+if __name__ == "__main__":
+    main()
+

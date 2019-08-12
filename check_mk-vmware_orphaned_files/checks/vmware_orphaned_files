@@ -1,0 +1,41 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# Author: Marius Pana <mp@sphs.ro>
+# EXAMPLE DATA FROM:
+# format: [datastore] [path] [size] [last mod date]
+#<<<vmware_orphaned_files>>>
+# [EUFRLHODS01] EUFRLHOAPP30/EUFRLHOAPP30-000002.vmdk 0.02 2015-1-29
+# [EUFRLHODS01] EUFRLHOAPP30/EUFRLHOAPP30_1-000002.vmdk 0.02 2015-1-29
+# [EUFRLHODS01] EUFRLHOAPP30/EUFRLHOAPP30_2-000002.vmdk 0.02 2015-1-29
+
+def inventory_vmware_orphaned_files(info):
+    if len(info) >= 1 and len(info[0]) >= 1:
+        return [ (None, None) ]
+    else:
+        return [ (None, None) ]
+#        return [('No VMware orphan files detected', None)]
+
+def check_vmware_orphaned_files(item, params, info):
+    #if not item:
+    #    return (0, "No VIMII orphan files found.")
+    if len(info) >= 1 and len(info[0]) >= 1:
+        total = len(info)
+        extended_info=""
+        for line in info:
+            if not line[0].startswith("["):
+                return (3, "There is a problem running the plugin. Please verify server")
+            else:
+                datastore = line[0]
+                path = line[1]
+                whichorphs = datastore + " " + path
+                extended_info += ' '.join(map(str,line)) + "<br>"
+                return (1, "WARN - VMware Orphan Files Detected: There are %d orphan files: %s" % (total, extended_info), [ ("vmware_orphaned_files", total) ])
+    else:
+        return (0, "OK - No VMware Orphan Files Detected")
+
+check_info["vmware_orphaned_files"] = {
+    'check_function':        check_vmware_orphaned_files,
+    'inventory_function':    inventory_vmware_orphaned_files,
+    'service_description':   'VMware Orphaned Files',
+    'group':                 'vmware_orphaned_files',
+}

@@ -1,0 +1,431 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2018             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# tails. You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+import datetime
+
+def inventory_edges_status(info):
+    for name, edgeid, edgestatus, edgestate, edgetype in info:
+	yield ("Edge %s" % \
+                (edgeid), {})
+
+
+def check_edges_status(item, params, info):
+    for line in info:
+	edge = "Edge" + " " + line[1]
+        if edge==item:
+            edgename = line[0]
+            edgestatus = line[2]
+	    edgestate = line[3]
+	    edgetype = line[4]
+            if edgetype == "distributedRouter":
+	        if edgestate != "active":
+		    return 2, "Edge %s state is %s and status %s" % (edgename, edgestate, edgestatus )
+       	        elif edgestatus == "GREEN":
+                    return 0, "Edge %s state is %s and status %s" % (edgename, edgestate, edgestatus )
+	        elif edgestatus == "GREY":
+		    return 0, "Edge %s state is %s and status %s" % (edgename, edgestate, edgestatus )
+                elif edgestatus == "YELLOW":
+                    return 1, "Edge %s state is %s and status %s" % (edgename, edgestate, edgestatus )
+	        elif edgestatus == "RED":
+                    return 2, "Edge %s state is %s and status %s" % (edgename, edgestate, edgestatus )
+                return 3, "Edge %s state is %s and status %s" % (edgename, edgestate, edgestatus )
+            else:
+		if edgestatus == "GREEN":
+                    return 0, "Edge %s is %s" % (edgename, edgestatus)
+                elif edgestatus == "YELLOW":
+                    return 1, "Edge %s is %s" % (edgename, edgestatus)
+                elif edgestatus == "RED":
+                    return 2, "Edge %s is %s" % (edgename, edgestatus)
+                return 3, "Edge %s is %s" % (edgename, edgestatus)
+
+
+check_info['nsx_edges'] = {
+    'inventory_function'    : inventory_edges_status,
+    'check_function'        : check_edges_status,
+    'service_description'   : '%s', 
+    'has_perfdata'          : False,
+}
+
+#.
+#   .--Controller Status---------------------------------------------------.
+#   |             ____            _             _ _                        |
+#   |            / ___|___  _ __ | |_ _ __ ___ | | | ___ _ __              |
+#   |           | |   / _ \| '_ \| __| '__/ _ \| | |/ _ \ '__|             |
+#   |           | |__| (_) | | | | |_| | | (_) | | |  __/ |                |
+#   |            \____\___/|_| |_|\__|_|  \___/|_|_|\___|_|                |
+#   |                                                                      |
+#   |                    ____  _        _                                  |
+#   |                   / ___|| |_ __ _| |_ _   _ ___                      |
+#   |                   \___ \| __/ _` | __| | | / __|                     |
+#   |                    ___) | || (_| | |_| |_| \__ \                     |
+#   |                   |____/ \__\__,_|\__|\__,_|___/                     |
+#   |                                                                      |
+#   +----------------------------------------------------------------------+
+#   |                                                                      |
+#   '----------------------------------------------------------------------'
+
+def inventory_controller_status(info):
+    for name, id, status in info:
+        yield ("Controller %s" % \
+                (id), {})
+
+
+def check_controller_status(item, params, info):
+    for line in info:
+        controller = "Controller" + " " + line[1]
+        if controller==item:
+            controllername = line[0]
+            controllerstatus = line[2]
+            if controllerstatus == "RUNNING":
+                return 0, "Controller %s is %s" % (controllername, controllerstatus)
+            elif controllerstatus == "DEPLOYING":
+		return 1, "Controller %s is %s" % (controllername, controllerstatus)
+	    elif controllerstatus == "REMOVING":
+		return 1, "Controller %s is %s" % (controllername, controllerstatus)
+	    elif controllerstatus == "UNKNOWN":
+                return 2, "Controller %s is %s" % (controllername, controllerstatus)
+
+check_info['nsx_controller'] = {
+    'inventory_function'    : inventory_controller_status,
+    'check_function'        : check_controller_status,
+    'service_description'   : '%s',
+    'has_perfdata'          : False,
+}
+
+
+
+#.
+#   .--NSX Components------------------------------------------------------.
+#   |                           _   _ ______  __                           |
+#   |                          | \ | / ___\ \/ /                           |
+#   |                          |  \| \___ \\  /                            |
+#   |                          | |\  |___) /  \                            |
+#   |                          |_| \_|____/_/\_\                           |
+#   |                                                                      |
+#   |       ____                                             _             |
+#   |      / ___|___  _ __ ___  _ __   ___  _ __   ___ _ __ | |_ ___       |
+#   |     | |   / _ \| '_ ` _ \| '_ \ / _ \| '_ \ / _ \ '_ \| __/ __|      |
+#   |     | |__| (_) | | | | | | |_) | (_) | | | |  __/ | | | |_\__ \      |
+#   |      \____\___/|_| |_| |_| .__/ \___/|_| |_|\___|_| |_|\__|___/      |
+#   |                          |_|                                         |
+#   +----------------------------------------------------------------------+
+#   |                                                                      |
+#   '----------------------------------------------------------------------'
+def inventory_nsx_components(info):
+    for name, id, status in info:
+        yield ("Component %s" % \
+                (id), {})
+
+
+def check_nsx_components(item, params, info):
+    for line in info:
+	component = "Component" + " " + line[1]
+        if component==item:
+            component_name = line[0]
+            component_status = line[2]
+            if component_status == "RUNNING":
+                return 0, "Component %s is %s" % (component_name, component_status)
+            else:
+                return 2, "Component %s is %s" % (component_name, component_status)
+
+check_info['nsx_components'] = {
+    'inventory_function'    : inventory_nsx_components,
+    'check_function'        : check_nsx_components,
+    'service_description'   : '%s',
+    'has_perfdata'          : False,
+}
+
+#.
+#   .--NSX Backup----------------------------------------------------------.
+#   |         _   _ ______  __  ____             _                         |
+#   |        | \ | / ___\ \/ / | __ )  __ _  ___| | ___   _ _ __           |
+#   |        |  \| \___ \\  /  |  _ \ / _` |/ __| |/ / | | | '_ \          |
+#   |        | |\  |___) /  \  | |_) | (_| | (__|   <| |_| | |_) |         |
+#   |        |_| \_|____/_/\_\ |____/ \__,_|\___|_|\_\\__,_| .__/          |
+#   |                                                      |_|             |
+#   +----------------------------------------------------------------------+
+#   |                                                                      |
+#   '----------------------------------------------------------------------'
+def inventory_nsx_backups(info):
+    return [(None, {})]
+
+
+def check_nsx_backup(item, params, info):
+    warn, crit = params
+    if info:
+        last_backup = sorted(info, key=lambda tup: tup[2])[-1]
+        last_backup_size = last_backup[1]
+        last_backup_time = datetime.datetime.fromtimestamp(float(last_backup[2])/1000)
+        elapsed = datetime.datetime.now() - last_backup_time
+        if elapsed >= datetime.timedelta(days=crit):
+           return 2, "Last backup was taken more than %s days ago. Last backup date is %s " \
+	    	 	% (crit, last_backup_time)
+        elif elapsed >= datetime.timedelta(days=warn):
+           return 1, "Last backup was taken more than %s days ago. Last backup date is %s " \
+                        % (warn, last_backup_time)
+        else:
+           return 0, "Date of last backup is %s" % last_backup_time
+    else:
+        return 3, "Backup not available"
+
+check_info['nsx_backup'] = {
+    'inventory_function'    : inventory_nsx_backups,
+    'check_function'        : check_nsx_backup,
+    'service_description'   : 'NSX Backups',
+    'has_perfdata'          : False,
+    'group'                 : "backups",
+}
+
+#.
+#   .--Memory--------------------------------------------------------------.
+#   |               __  __                                                 |
+#   |              |  \/  | ___ _ __ ___   ___  _ __ _   _                 |
+#   |              | |\/| |/ _ \ '_ ` _ \ / _ \| '__| | | |                |
+#   |              | |  | |  __/ | | | | | (_) | |  | |_| |                |
+#   |              |_|  |_|\___|_| |_| |_|\___/|_|   \__, |                |
+#   |                                                |___/                 |
+#   +----------------------------------------------------------------------+
+nsx_memory_default_levels = ( 80.0, 90.0 )
+
+def nsx_convert(info):
+    data = {}
+    for line in info:
+        data[line[0]] = line[1:]
+    return data
+
+def inventory_nsx_mem(info):
+    data = nsx_convert(info)
+    return [(None, 'nsx_mem_default_levels')]
+
+def check_nsx_mem(item, params, info):
+    data = nsx_convert(info)
+    warn, crit = params
+    memory_usage = savefloat(data['UsedMemory'][0]) * 1024 * 1024
+    memory_size = savefloat(data['TotalMem'][0]) * 1024 * 1024
+    level = savefloat(data['UsedPercentage'][0])
+    state = 0
+    label = ''
+    if level >= crit:
+       state = 2
+       label = " (Levels at %d%%/%d%%)" % (warn, crit)
+    elif level >= warn:
+        state = 1
+        label = " (Levels at %d%%/%d%%)" % (warn, crit)
+    message = "%d%%%s used - %s/%s" % \
+    (level, label, get_bytes_human_readable(memory_usage), get_bytes_human_readable(memory_size))
+    perf = [("mem_used", memory_usage, warn * memory_size / 100, crit * memory_size / 100, 0, memory_size),
+            ("mem_total", memory_size)]
+    return(state, message, perf)
+
+
+check_info['nsx_memory'] = {
+  "inventory_function"      : inventory_nsx_mem,
+  "check_function"          : check_nsx_mem,
+  "service_description"     : "Memory used",
+  "group"                   : "nsx_memory",
+  "has_perfdata"            : True,
+  "default_levels_variable" : "nsx_mem_default_levels"
+}
+
+#.
+#   .--CPU-----------------------------------------------------------------.
+#   |                           ____ ____  _   _                           |
+#   |                          / ___|  _ \| | | |                          |
+#   |                         | |   | |_) | | | |                          |
+#   |                         | |___|  __/| |_| |                          |
+#   |                          \____|_|    \___/                           |
+#   |                                                                      |
+#   +----------------------------------------------------------------------+
+
+nsx_host_cpu_default_levels = {}
+
+def inventory_nsx_cpu(info):
+    data = nsx_convert(info).keys()
+    if 'usedPercentage' in data \
+        and 'totalNoOfCPUs' in data\
+        and 'capacity' in data:
+        return [(None, {})]
+
+def check_nsx_cpu(item, params, info):
+    data = nsx_convert(info)
+
+    if "usedPercentage" not in data:
+        return
+    #Asuming that there are 1 thread per core and one core per socket
+    #Asuming that capacity represents total capacity
+    
+    num_cpu = int(data['totalNoOfCPUs'][0])
+    total_capacity = int(data['capacity'][0])
+    used_capacity = float(data['usedCapacity'][0])
+    mhz_per_core = float(data['capacity'][0]) / num_cpu
+    
+
+    usage = used_capacity / total_capacity * 100
+    per_core = num_cpu / 100.0
+
+    infotext = "%.1f%%" % usage
+
+    # Convert legacy parameters
+    this_time = time.time()
+    state, infotext, perfdata = check_cpu_util(usage, params).next()
+
+    infotext += ", %.2fGHz/%.2fGHz" % (used_capacity / 1000.0, total_capacity / 1000.0)
+    infotext += ", %d sockets, %d cores/socket, %d threads" % (
+            num_cpu, 1 , 1)
+    return (state, infotext, perfdata)
+
+
+check_info['nsx_cpu'] = {
+   "inventory_function"      : inventory_nsx_cpu,
+   "check_function"          : check_nsx_cpu,
+   "service_description"     : "CPU utilization",
+   "group"                   : "cpu_utilization_os",
+   "has_perfdata"            : True,
+   "default_levels_variable" : "nsx_host_cpu_default_levels",
+   "includes"                : [ "cpu_util.include" ],
+}
+
+#.
+#   .--NSX vCenter Connection----------------------------------------------.
+#   |        _   _ ______  __         ____           _                     |
+#   |       | \ | / ___\ \/ / __   __/ ___|___ _ __ | |_ ___ _ __          |
+#   |       |  \| \___ \\  /  \ \ / / |   / _ \ '_ \| __/ _ \ '__|         |
+#   |       | |\  |___) /  \   \ V /| |__|  __/ | | | ||  __/ |            |
+#   |       |_| \_|____/_/\_\   \_/  \____\___|_| |_|\__\___|_|            |
+#   |                                                                      |
+#   |          ____                            _   _                       |
+#   |         / ___|___  _ __  _ __   ___  ___| |_(_) ___  _ __            |
+#   |        | |   / _ \| '_ \| '_ \ / _ \/ __| __| |/ _ \| '_ \           |
+#   |        | |__| (_) | | | | | | |  __/ (__| |_| | (_) | | | |          |
+#   |         \____\___/|_| |_|_| |_|\___|\___|\__|_|\___/|_| |_|          |
+#   |                                                                      |
+#   +----------------------------------------------------------------------+
+#   |                                                                      |
+#   '----------------------------------------------------------------------'
+def inventory_nsx_vcenter_connection(info):
+    return [(None, {})]
+
+
+def check_nsx_vcenter_connection(item, params, info):
+    if "true" in info[0]:
+        return 0, "vCenterConnection is true"
+    elif "false" in info[0]:
+        return 2, "vCenterConnection is false"
+
+check_info['nsx_vcenter_connection'] = {
+    'inventory_function'    : inventory_nsx_vcenter_connection,
+    'check_function'        : check_nsx_vcenter_connection,
+    'service_description'   : 'vCenter Connection',
+    'has_perfdata'          : False,
+}
+
+
+#.
+#   .--NSX Storage Info----------------------------------------------------.
+#   |        _   _ ______  __  ____  _                                     |
+#   |       | \ | / ___\ \/ / / ___|| |_ ___  _ __ __ _  __ _  ___         |
+#   |       |  \| \___ \\  /  \___ \| __/ _ \| '__/ _` |/ _` |/ _ \        |
+#   |       | |\  |___) /  \   ___) | || (_) | | | (_| | (_| |  __/        |
+#   |       |_| \_|____/_/\_\ |____/ \__\___/|_|  \__,_|\__, |\___|        |
+#   |                                                   |___/              |
+#   |                         ___        __                                |
+#   |                        |_ _|_ __  / _| ___                           |
+#   |                         | || '_ \| |_ / _ \                          |
+#   |                         | || | | |  _| (_) |                         |
+#   |                        |___|_| |_|_|  \___/                          |
+#   |                                                                      |
+#   +----------------------------------------------------------------------+
+#   |                                                                      |
+#   '----------------------------------------------------------------------'
+nsx_storage_default_levels = ( 70.0, 80.0 )
+
+def inventory_nsx_storage(info):
+    data = nsx_convert(info)
+    return [(None, 'nsx_storage_default_levels')]
+
+def check_nsx_storage(item, params, info):
+    warn,crit = params
+    data = nsx_convert(info)
+    used_storage = float(re.sub('G','', data['UsedStorage'][0],count =1))
+    total_storage = float(re.sub('G','', data['TotalStorage'][0],count =1))
+    free_storage = float(re.sub('G','', data['FreeStorage'][0],count =1))
+    used_percentage = float(re.sub('G','', data['UsedPercentage'][0],count =1))
+    perf = [("storage_used", used_storage * 1024 * 1024 * 1024, \
+	    warn * total_storage * 1024 * 1024 * 1024  / 100 , \
+	    crit * total_storage * 1024 * 1024 * 1024 / 100 , 0, total_storage * 1024 * 1024 * 1024)]
+    if used_percentage >= crit:
+	return 2, "Storage used is %sGB out of %sGB" % (used_storage, total_storage) , perf
+    elif used_percentage >= warn:
+        return 1, "Storage used is %sGB out of %sGB" % (used_storage, total_storage) , perf
+    else:
+        return 0, "Storage used is %sGB out of %sGB" % (used_storage, total_storage) , perf
+
+check_info['nsx_storage_info'] = {
+  "inventory_function"      : inventory_nsx_storage,
+  "check_function"          : check_nsx_storage,
+  "service_description"     : "Storage used",
+  "group"                   : "nsx_storage",
+  "has_perfdata"            : True,
+  "default_levels_variable" : "nsx_storage_default_levels",
+
+}
+
+
+
+####NSX_RESOURCES
+def inventory_nsx_resources(info):
+    for domain_name, component, status in info:
+        component_sn = component.split(".")[-1]
+        yield ("%s %s" % \
+                (domain_name, component_sn), {})
+
+
+def check_nsx_resources(item, params, info):
+    for line in info:
+        component = line[0] + " " + line[1].split(".")[-1]
+        if component==item:
+            domain_name = line[0]
+            component_name = line[1].split(".")[-1]
+            component_status = line[2]
+            if component_name == "hostRebootRequired":
+                if component_status == "false":
+                    return 0, "Host reboot is not required. "
+                else:
+                    return 1, "Host needs a reboot"
+
+            if component_status == "GREEN":
+                return 0, "Component %s is %s" % (component_name, component_status)
+            elif component_status =="UNKNOWN":
+                return 3, "Status is unknown"
+            else:
+                return 2, "Component %s is %s" % (component_name, component_status)
+
+check_info['nsx_resources'] = {
+    'inventory_function'    : inventory_nsx_resources,
+    'check_function'        : check_nsx_resources,
+    'service_description'   : '%s',
+    'has_perfdata'          : False,
+}

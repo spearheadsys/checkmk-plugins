@@ -1,0 +1,8 @@
+---
+usersAdd:
+  - mariusp
+usersDel:
+  - none
+usersPSK:
+  - name: mariusp
+    psk: ["../files/ssh_keys/mariusp.pub"]

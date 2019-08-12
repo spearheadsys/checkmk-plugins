@@ -1,0 +1,57 @@
+global
+    log         127.0.0.1 local2
+    chroot      /var/lib/haproxy
+    pidfile     /var/run/haproxy.pid
+    maxconn     4000
+    user        haproxy
+    group       haproxy
+    daemon
+    stats socket /var/lib/haproxy/stats mode 644 level admin
+    stats timeout 2m
+
+#---------------------------------------------------------------------
+# common defaults that all the 'listen' and 'backend' sections will
+# use if not designated in their block
+#---------------------------------------------------------------------
+defaults
+    mode                    http
+    log                     global
+    option                  httplog
+    option                  dontlognull
+    option http-server-close
+    option forwardfor       except 127.0.0.0/8
+    option                  redispatch
+    retries                 3
+    timeout http-request    10s
+    timeout queue           1m
+    timeout connect         10s
+    timeout client          1m
+    timeout server          1m
+    timeout http-keep-alive 10s
+    timeout check           10s
+    maxconn                 3000
+
+#---------------------------------------------------------------------
+# main frontend which proxys to the backends
+#---------------------------------------------------------------------
+frontend  main *:5000
+    acl url_static       path_beg       -i /static /images /javascript /stylesheets
+    acl url_static       path_end       -i .jpg .gif .png .css .js
+
+    #use_backend static          if url_static
+    #default_backend             appname
+
+##
+listen appname 0.0.0.0:80
+    mode http
+    stats enable
+    stats uri /haproxy?stats
+    stats realm Strictly\ Private
+    stats auth marius:marius
+    balance roundrobin
+    option httpclose
+    option forwardfor
+    # we are adding our hosts manually ..
+    # we could populate this dynamically from our inventory
+    server web1 10.88.88.128:80 check
+    server web2 10.88.88.129:80 check

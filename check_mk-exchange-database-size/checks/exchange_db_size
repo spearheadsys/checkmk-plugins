@@ -1,0 +1,51 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# Author: Marius Pana <mp@sphs.ro>
+# EXAMPLE DATA FROM:
+# format: datbase size_in_MB free_MB_available
+#<<<exchange_db_size>>>
+#RomaniaEXC 177
+#ExchangeDB_Size 81
+
+factory_settings["exchange_db_size_default_values"] = {
+        "levels" : (20000, 25000),
+}
+
+exchange_db_size_default_values = (20000, 25000)
+
+def inventory_exchange_db_size(info):
+    inventory = []
+    for line in info:
+        database = line[0]
+        inventory.append((database, "exchange_db_size_default_values"))
+    return inventory
+
+def check_exchange_db_size(item, params, info):
+    if type(params) != dict:
+        params = { "levels" : params }
+    #unpack check params
+    warn, crit = params["levels"]
+    for line in info:
+        if line[0] == item:
+            dbsize = int(line[1])
+            #dbavail = int(line[2])
+            perfdata = [
+                ( "size", str(dbsize), warn, crit  ),
+                #( "avail", str(dbavail), warn, crit  ),
+            ]
+            if dbsize > crit:
+                return (2, "Database size is %dMB" % dbsize, perfdata)
+            elif dbsize > warn:
+                return (1, "Database size is %dMB" % dbsize, perfdata)
+            else:
+                return (0, "Database size is %dMB" % dbsize, perfdata)
+    return(3, "Database %s not found in agent output" % item)
+
+check_info["exchange_db_size"] = {
+    'check_function':        check_exchange_db_size,
+    'inventory_function':    inventory_exchange_db_size,
+    'service_description':   '%s Database size',
+    'default_levels_variable': 'exchange_user_mbx_size_default_values',
+    'has_perfdata':          True,
+    'group':                 'exchange_db_size',
+}

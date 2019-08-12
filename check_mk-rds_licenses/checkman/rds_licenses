@@ -1,0 +1,30 @@
+title: Check for RDS licenses usage state 
+agents: windows
+catalog: os/windows
+license: GPL
+distribution:
+description:
+ This check return usage of RDS licenses. 
+ You need to install the plugin {rds_licenses_2008.ps1}
+ into the {plugins} directory of your windows agent in 
+ case of Win 2008 Server. In case of Win 2012 Server
+ in plugin directory must be copied elevate_shell.ps1
+ and the rds_licenses_2008.ps1 must be copied into 
+ check_mk agent folder and the user which run the check_mk
+ service must be allowed to elevate privileges.   
+ This check was tested with Windows 2008 Server  
+ and must have PowerShell installed. On Windows x64 is 
+ recommended to use x64 agent. As always you must set
+ "set-executionpolicy remotesigned" on monitored host.
+
+ The check gets critical if the usage percentage is above 
+ 95 percents and warning if the usage percentage is above
+ 90 percents.
+ Both limits are definable in Wato under "Parameters for 
+ Inventorized Checks", "Applications, Processes & Services".
+
+inventory:
+ One service will be created for each host running the plugin.
+
+perfdata:
+ Licenses usage.

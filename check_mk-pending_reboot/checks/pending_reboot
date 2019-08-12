@@ -1,0 +1,48 @@
+#!/usr/bin/python
+# Author: George Mocanu <george.mocanu@sphs.ro>
+
+# EXAMPLE DATA FROM: 
+# fomat: pendingReboot 0 8 
+#
+#<<<pending_reboot>>>
+#pendingReboot 0 8
+
+factory_settings["pending_reboot_default_values"] = {
+        "levels": (12, 24),
+}
+
+def inventory_pending_reboot(info):
+    inventory = []
+    for line in info:
+        checkName = line[0]
+        inventory.append( (checkName, {} ) )
+    return inventory
+
+
+def check_pending_reboot(item, params, info):
+    if type(params) != dict:
+        params = { "levels": params }
+    warn, crit = params["levels"]
+    for line in info:
+        if line[0] == item:
+            status = int(line[1])
+            status_time = int(line[2])
+            if status == 1:
+                if status_time > crit:
+                    return (2, "Computer in pending reboot for %d Hours" %status_time)
+                elif status_time > warn:
+                    return (1, "Computer in pending reboot for %d Hours" %status_time)
+                else:
+                    return (0, "Computer in pending reboot for %d Hours" %status_time)
+            else:
+                return (0, "Computer not expecting reboot")
+    return(3, "Plugin not running on host")
+
+check_info["pending_reboot"] = {
+    "check_function"		:check_pending_reboot,
+    "inventory_function"	:inventory_pending_reboot,
+    "service_description"	:"%s",
+    "default_levels_variable"	:"pending_reboot_default_values",
+    "has_perfdata"		:False,
+    "group"			:"pending_reboot",
+}

@@ -1,0 +1,47 @@
+#!/usr/bin/python
+# SpearHead Systems george.mocanu@sphs.ro 2015
+
+# EXAMPLE DATA FROM:
+# fomat: "open_files" current_setted_value_of_open_files_limit  current_value_of_open_files
+#
+#<<<mysql_open_files>>>
+#open_files 3000 2305
+
+factory_settings["mysql_open_files_default_values"] = {
+        "levels": (80, 90),
+}
+
+def inventory_mysql_open_files(info):
+    inventory = []
+    for line in info:
+        checkName = line[0]
+        inventory.append( (checkName, {} ) )
+    return inventory
+
+
+def check_mysql_open_files(item, params, info):
+    if type(params) != dict:
+        params = { "levels": params }
+    warn, crit = params["levels"]
+    for line in info:
+        if line[0] == item:
+            open_files_limit = int(line[1])
+            open_files = int(line[2])
+            openPerc = int(((open_files*100)/open_files_limit))
+            perfdata = [ ( "open_files", openPerc, warn, crit ) ]
+            if openPerc > crit:
+                return (2, "Open files use level: %d percents. %d files opened out of maximum %d cconfigured." %(openPerc, open_files, open_files_limit), perfdata)
+            elif openPerc > warn:
+                return (1, "Open files use level: %d percents. %d files opened out of maximum %d cconfigured." %(openPerc, open_files, open_files_limit), perfdata)
+            else:
+                return (0, "Open files use level: %d percents. %d files opened out of maximum %d cconfigured." %(openPerc, open_files, open_files_limit), perfdata)
+    return(3, "Plugin not running on host")
+
+check_info["mysql_open_files"] = {
+    "check_function"            :check_mysql_open_files,
+    "inventory_function"        :inventory_mysql_open_files,
+    "service_description"       :"%s",
+    "default_levels_variable"   :"mysql_open_files_default_values",
+    "has_perfdata"              :True,
+    "group"                     :"mysql_open_files",
+}
