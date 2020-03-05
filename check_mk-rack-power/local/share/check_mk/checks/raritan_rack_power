@@ -1,0 +1,66 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2018             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# tails. You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+
+# Author: Markus Lengler <ml@lengler-it.de>
+
+# Example outputs from agent:
+# <<<rack_power>>>
+# PDU_NAME_TEST appower=1299.000000 current=4.400000 energy=29197620.000000 power=1227.000000 voltage=822.000000
+
+def inventory_rack_power(checkname, info):
+    yield info[0][0],None
+
+
+def check_rack_power(item, params, info):
+    if params:
+        warn, crit = params["power"]
+    else:
+        warn, crit = (16000,17500)
+    if info[0][0] in item:
+        value=int(str(info[0][4]).split("=")[1].split(".")[0])
+        perfdata = [ ("power", value , warn, crit ) ]  
+        state = 0
+        infotext = "Power usage: %s W"  % str(value)
+        if value > crit:
+            state = 2
+            infotext = "Power usage is higher than %s" % crit
+        elif value > warn:
+            state = 1
+            infotext = "Power is higher than %s" % warn
+
+        yield state, infotext, perfdata
+
+
+check_info["rack_power"] = {
+    'check_function'      :    check_rack_power,
+    'inventory_function'  :    inventory_rack_power,
+    'service_description' :    'Cabinet Summary %s',
+    'includes'            :    [ 'raritan.include', 'elphase.include' ],
+    'has_perfdata'        :    True,
+    'group'               :    "rack_power"
+
+}

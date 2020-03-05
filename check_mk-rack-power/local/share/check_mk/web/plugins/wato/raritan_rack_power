@@ -1,0 +1,22 @@
+register_check_parameters(
+    subgroup_environment,
+    "rack_power",
+    _("Parameters for input summary of PDUs in a rack(A+B)"),
+    Dictionary(
+        help = _("This rule allows you to specify levels for the power summary of multiple"
+                 " PDUs in the rack ."),
+        elements =  [
+            ( "power",
+              Tuple(
+                  title = _("Power"),
+                  elements = [
+                      Integer(title = _("warning at"), unit = u"W", default_value = 16000),
+                      Integer(title = _("critical at"), unit = u"W", default_value = 17500),
+                  ]
+            )),
+        ]),
+    TextAscii(
+        title = _("Input Summary Rack"),
+        help = _("The name of the rack")),
+    "dict"
+)
