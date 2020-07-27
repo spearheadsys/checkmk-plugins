@@ -87,7 +87,7 @@ def query(url):
 
 output_lines = []
 def output(line):
-    if type(line) not in [str, unicode]:
+    if type(line) not in [str]:
         output_lines.append(pprint.pformat(line))
     else:
         output_lines.append(line)
@@ -228,11 +228,11 @@ def main():
         # Get stores info
         process_stores_info()
 
-	process_servicesets_teaming()
-	process_stores_info_teaming()
+        process_servicesets_teaming()
+        process_stores_info_teaming()
 
         sys.stdout.write("\n".join(output_lines) + "\n")
-    except Exception, e:
+    except Exception as e:
         sys.stderr.write("Connection error: %s" % e)
         sys.exit(1)
 
