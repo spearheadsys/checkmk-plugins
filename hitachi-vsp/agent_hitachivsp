@@ -24,11 +24,11 @@
 # to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
 # Boston, MA 02110-1301 USA.
 
-import re
 import sys
 import getopt
-import urllib3
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
+import pprint
+import json
+#from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 
 def usage():
@@ -45,8 +45,10 @@ OPTIONS:
 """)
     sys.exit(1)
 
+
 short_options = "h"
-long_options  = ["help", "username=", "password=", "address=", "demo", "no-cert-check"]
+long_options = ["help", "username=", "password=", "address=", "demo", "no-cert-check"]
+
 
 try:
     opts, args = getopt.getopt(sys.argv[1:], short_options, long_options)
@@ -55,9 +57,10 @@ except getopt.GetoptError as err:
     sys.exit(1)
 
 
-opt_demo = False
+opt_demo = True
 opt_cert = True
 args_dict = {}
+
 
 for o,a in opts:
     if o in [ "--address" ]:
@@ -77,162 +80,182 @@ for o,a in opts:
 def query(url):
     if opt_cert == False:
         requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-    response     = requests.get(url, auth = (args_dict["username"], args_dict["password"]), verify=opt_cert)
-    raw_xml      = response.text
-    # Remove namespace nonsense
-    raw_xml      = re.sub(' xmlns="[^"]+"', '', raw_xml, count=1)
-#    raw_xml = re.sub(' http-equiv="[^"]+"', '', raw_xml, count=1)
-    xml_instance = ET.fromstring(raw_xml)
-    return xml_instance
+    response = requests.get(url, auth = (args_dict["username"], args_dict["password"]), verify=opt_cert)
+    raw_json = response.text
+    return raw_json
 
 
 output_lines = []
 def output(line):
     if type(line) not in [str]:
-        output_lines.append(pprint.pformat(line))
+        output_lines.append(pprint.pprint(line))
     else:
         output_lines.append(line)
 
 
-def process_cluster_info():
-    output("<<<storeonce_clusterinfo:sep(9)>>>")
-    xml_instance = query_cluster_info()
-    tbody = xml_instance.find("body").find("div").find("table").find("tbody")
-    for child in tbody:
-        name  = child[0].text
-        value = child[1].text
-        output("%s\t%s" % (name, value))
-
-
-def query_cluster_info():
+def get_storage_info():
     if opt_demo:
-        raw_xml      = re.sub(' xmlns="[^"]+"', '', cluster_xml, count=1)
-        return ET.fromstring(raw_xml)
-    url = "https://%(address)s/storeonceservices/cluster/" % args_dict
-    return query(url)
-
-serviceset_ids = set()
-def process_servicesets():
-    output("<<<storeonce_servicesets:sep(9)>>>")
-    xml_instance = query_servicesets()
-    servicesets = xml_instance.find("body").find("div")
-    for element in servicesets:
-        tbody = element.find("table").find("tbody")
-        serviceset_id = tbody[0][1].text
-        serviceset_ids.add(serviceset_id)
-        output("[%s]" % serviceset_id)
-        for child in tbody:
-            name  = child[0].text
-            value = child[1].text
-            output("%s\t%s" % (name, value))
-
-
-def query_servicesets():
-    if opt_demo:
-        raw_xml = re.sub(' xmlns="[^"]+"', '', servicesets_xml, count=1)
-        return ET.fromstring(raw_xml)
-    url = "https://%(address)s/storeonceservices/cluster/servicesets/" % args_dict
+        raw_json = storage_info
+        return raw_json
+    url = "https://%(address)s/ConfigurationManager/v1/objects/storages/instance" % args_dict
     return query(url)
 
 
-def process_stores_info():
-    output("<<<storeonce_stores:sep(9)>>>")
-    for serviceset_id in serviceset_ids:
-        xml_instance = query_stores_info(serviceset_id)
-        stores = xml_instance.find("body").find("div")
-        for element in stores:
-            tbody = element.find("table").find("tbody")
-            store_id = tbody[0][1].text
-            output("[%s/%s]" % (serviceset_id, store_id))
-            serviceset_ids.add(serviceset_id)
-            for child in tbody:
-                name  = child[0].text
-                value = child[1].text
-                output("%s\t%s" % (name, value))
-
-
-def query_stores_info(serviceset_id):
+def get_storage_pools():
     if opt_demo:
-        raw_xml = re.sub(' xmlns="[^"]+"', '', stores_xml, count=1)
-        return ET.fromstring(raw_xml)
-
-    url = "https://%(address)s/storeonceservices/cluster/servicesets/" % args_dict + \
-            "%s/services/cat/stores/" % serviceset_id
+        raw_json = storage_pools
+        return raw_json
+    url = "https://%(address)s/ConfigurationManager/v1/objects/pools" % args_dict
     return query(url)
 
-serviceset_ids_teaming = set()
-def process_servicesets_teaming():
-    output("<<<storeonce_servicesets_team:sep(9)>>>")
-    xml_instance = query_servicesets_teaming()
-    servicesets_teaming = xml_instance.find("body").find("div")
-    for element in servicesets_teaming:
-        tbody = element.find("table").find("tbody")
-        serviceset_id_teaming = tbody[0][1].text
-        serviceset_ids_teaming.add(serviceset_id_teaming)
-        output("[%s]" % serviceset_id_teaming)
-        for child in tbody:
-            name  = child[0].text
-            value = child[1].text
-            output("%s\t%s" % (name, value))
+def process_storage_pools ():
+    output("<<<hitachi_storage_pools:sep(9)>>>")
+    raw_json = get_storage_pools()
+    full_data = json.loads(raw_json)
+    data = full_data["data"]
+    output("poolID\tpoolType\tpoolName\ttotalPhysicalCapacity\ttotalPoolCapacity\tavailableVolumeCapacity\tusedCapacityRate")
+    for pool in data:
+        if pool["poolType"] == "HTI":
+            output("%s\t%s\t%s\t%s\t%s\t%s\t%s" % (pool["poolId"], pool["poolType"], pool["poolName"], \
+                                               pool["totalPhysicalCapacity"], pool["totalPoolCapacity"], \
+                                               pool["availableVolumeCapacity"], pool["usedCapacityRate"]) )
 
 
-def query_servicesets_teaming():
-    if opt_demo:
-        raw_xml = re.sub(' xmlns="[^"]+"', '', servicesets_xml, count=1)
-        return ET.fromstring(raw_xml)
-    url = "https://%(address)s/storeonceservices/cluster/servicesets/1/teaming/services/cat/stores" % args_dict
-    return query(url)
-
-
-def process_stores_info_teaming():
-    output("<<<storeonce_stores_team:sep(9)>>>")
-    for serviceset_id_teaming in serviceset_ids_teaming:
-        xml_instance = query_stores_info_teaming(serviceset_id_teaming)
-        stores = xml_instance.find("body").find("div")
-        for element in stores:
-            tbody = element.find("table").find("tbody")
-            store_id = tbody[0][1].text
-            output("[%s/%s]" % (serviceset_id_teaming, store_id))
-            serviceset_ids_teaming.add(serviceset_id_teaming)
-            for child in tbody:
-                name  = child[0].text
-                value = child[1].text
-                output("%s\t%s" % (name, value))
-
-
-
-def query_stores_info_teaming(serviceset_id):
-    if opt_demo:
-        raw_xml = re.sub(' xmlns="[^"]+"', '', stores_xml_teaming, count=1)
-        return ET.fromstring(raw_xml)
-
-    url = "https://%(address)s/storeonceservices/cluster/servicesets/" % args_dict + \
-            "1/teaming/services/cat/stores/%s" % serviceset_id
-    return query(url)
-
-
-
-
+def process_storage_info():
+    output("<<<hitachi_storage_info:sep(9)>>>")
+    raw_json = get_storage_info()
+    data = json.loads(raw_json)
+    output("%s\t%s\t%s\t%s" % (data["serialNumber"], data["storageDeviceId"], data["dkcMicroVersion"], data["model"]))
 
 def main():
     try:
-        # Get cluster info
-        process_cluster_info()
-
-        # Get servicesets
-        process_servicesets()
-
-        # Get stores info
-        process_stores_info()
-
-        process_servicesets_teaming()
-        process_stores_info_teaming()
+        process_storage_info()
+        process_storage_pools()
 
         sys.stdout.write("\n".join(output_lines) + "\n")
     except Exception as e:
         sys.stderr.write("Connection error: %s" % e)
         sys.exit(1)
 
+
+storage_info = """{
+ "storageDeviceId": "666666666666",
+ "model": "VSP G700",
+ "serialNumber": 666666,
+ "ctl1Ip": "192.168.223.69",
+ "ctl2Ip": "192.168.223.70",
+ "dkcMicroVersion": "88-04-03/00",
+ "communicationModes": [
+   {
+     "communicationMode": "lanConnectionMode"
+   }
+ ],
+ "isSecure": true
+}"""
+
+storage_pools = """
+{
+  "data" : [ {
+    "poolId" : 0,
+    "poolStatus" : "POLN",
+    "usedCapacityRate" : 47,
+    "usedPhysicalCapacityRate" : 47,
+    "poolName" : "RAID6_HDT_01",
+    "availableVolumeCapacity" : 208964826,
+    "availablePhysicalVolumeCapacity" : 208964826,
+    "totalPoolCapacity" : 397630296,
+    "totalPhysicalCapacity" : 397630296,
+    "numOfLdevs" : 136,
+    "firstLdevId" : 3,
+    "warningThreshold" : 80,
+    "depletionThreshold" : 90,
+    "virtualVolumeCapacityRate" : -1,
+    "isMainframe" : false,
+    "isShrinking" : true,
+    "locatedVolumeCount" : 242,
+    "totalLocatedCapacity" : 234976098,
+    "blockingMode" : "NB",
+    "totalReservedCapacity" : 0,
+    "reservedVolumeCount" : 0,
+    "poolActionMode" : "AUT",
+    "tierOperationStatus" : "MON",
+    "dat" : "VAL",
+    "poolType" : "RT",
+    "monitoringMode" : "CM",
+    "tiers" : [ {
+      "tierNumber" : 1,
+      "tierLevelRange" : "00000001",
+      "tierDeltaRange" : "00000005",
+      "tierUsedCapacity" : 31524696,
+      "tierTotalCapacity" : 37087848,
+      "tablespaceRate" : 10,
+      "performanceRate" : 4,
+      "progressOfReplacing" : 100,
+      "bufferRate" : 5
+    }, {
+      "tierNumber" : 2,
+      "tierLevelRange" : "00000000",
+      "tierDeltaRange" : "00000005",
+      "tierUsedCapacity" : 98679336,
+      "tierTotalCapacity" : 116093208,
+      "tablespaceRate" : 10,
+      "performanceRate" : 12,
+      "progressOfReplacing" : 100,
+      "bufferRate" : 5
+    }, {
+      "tierNumber" : 3,
+      "tierLevelRange" : "00000000",
+      "tierDeltaRange" : "00000000",
+      "tierUsedCapacity" : 58461480,
+      "tierTotalCapacity" : 244449240,
+      "tablespaceRate" : 10,
+      "performanceRate" : 62,
+      "progressOfReplacing" : 100,
+      "bufferRate" : 5
+    } ],
+    "dataReductionAccelerateCompCapacity" : 0,
+    "dataReductionAccelerateCompRate" : 0,
+    "compressionRate" : 0,
+    "dataReductionAccelerateCompIncludingSystemData" : {
+      "isReductionCapacityAvailable" : true,
+      "reductionCapacity" : 0,
+      "isReductionRateAvailable" : true,
+      "reductionRate" : 0
+    },
+    "capacitiesExcludingSystemData" : {
+      "usedVirtualVolumeCapacity" : 386386968576
+    }
+  }, {
+    "poolId" : 1,
+    "poolStatus" : "POLN",
+    "usedCapacityRate" : 0,
+    "usedPhysicalCapacityRate" : 0,
+    "snapshotCount" : 0,
+    "poolName" : "THIN_IMAGE_POOL",
+    "availableVolumeCapacity" : 46453344,
+    "availablePhysicalVolumeCapacity" : 46453344,
+    "totalPoolCapacity" : 46453344,
+    "totalPhysicalCapacity" : 46453344,
+    "numOfLdevs" : 16,
+    "firstLdevId" : 22,
+    "warningThreshold" : 80,
+    "virtualVolumeCapacityRate" : -1,
+    "isMainframe" : false,
+    "isShrinking" : false,
+    "poolType" : "HTI",
+    "dataReductionAccelerateCompCapacity" : 0,
+    "dataReductionAccelerateCompRate" : 0,
+    "compressionRate" : 0,
+    "dataReductionAccelerateCompIncludingSystemData" : {
+      "isReductionCapacityAvailable" : true,
+      "reductionCapacity" : 0,
+      "isReductionRateAvailable" : false
+    },
+    "capacitiesExcludingSystemData" : {
+      "usedVirtualVolumeCapacity" : 0
+    }
+  } ]
+}"""
+
 if __name__ == "__main__":
     main()
-
