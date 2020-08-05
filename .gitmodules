@@ -1,0 +1,3 @@
+[submodule "juniper"]
+	path = juniper
+	url = https://github.com/spearheadsys/check_mk.git
