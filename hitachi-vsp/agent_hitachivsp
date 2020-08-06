@@ -117,6 +117,26 @@ def get_storage_clprs():
     return query(url)
 
 
+def get_storage_ldevs():
+    if opt_demo:
+        raw_json = storage_ldevs
+        return raw_json
+    url = "https://%(address)s/ConfigurationManager/v1/objects/ldevs" % args_dict
+    return query(url)
+
+
+def process_storage_ldevs():
+    output("<<<hitachi_storage_ldevs:sep(9)>>>")
+    raw_json = get_storage_ldevs()
+    full_data = json.loads(raw_json)
+    data = full_data["data"]
+    output("ldevId\tclprId\tbyteFormatCapacity\tblockCapacity\t"
+          "label\tstatus")
+    for ldev in data:
+        output("%s\t%s\t%s\t%s\t%s\t%s" % (ldev["ldevId"], ldev["clprId"], ldev["byteFormatCapacity"],
+                                   ldev["blockCapacity"], ldev["label"], ldev["status"]))
+
+
 def process_storage_clprs():
     output("<<<hitachi_storage_clprs:sep(9)>>>")
     raw_json = get_storage_clprs()
@@ -141,6 +161,7 @@ def process_storage_pools ():
                                                pool["availableVolumeCapacity"], pool["usedCapacityRate"],
                                                pool["poolStatus"],))
 
+
 def process_storage_info():
     output("<<<hitachi_storage_info:sep(9)>>>")
     raw_json = get_storage_info()
@@ -152,6 +173,7 @@ def main():
         process_storage_info()
         process_storage_pools()
         process_storage_clprs()
+        process_storage_ldevs()
         sys.stdout.write("\n".join(output_lines) + "\n")
     except Exception as e:
         sys.stderr.write("Connection error: %s" % e)
@@ -294,5 +316,248 @@ storage_pools = """
   } ]
 }"""
 
+storage_ldevs = """ {
+  "data" : [ {
+    "ldevId" : 0,
+    "clprId" : 0,
+    "emulationType" : "OPEN-V-CVS",
+    "byteFormatCapacity" : "500.00 G",
+    "blockCapacity" : 1048576000,
+    "numOfPorts" : 4,
+    "ports" : [ {
+      "portId" : "CL2-B",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 1
+    }, {
+      "portId" : "CL1-B",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 1
+    }, {
+      "portId" : "CL2-A",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 1
+    }, {
+      "portId" : "CL1-A",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 1
+    } ],
+    "attributes" : [ "CVS", "HDP" ],
+    "label" : "vg_test0",
+    "status" : "NML",
+    "mpBladeId" : 0,
+    "ssid" : "0004",
+    "poolId" : 0,
+    "numOfUsedBlock" : 0,
+    "isFullAllocationEnabled" : false,
+    "resourceGroupId" : 0,
+    "dataReductionStatus" : "DISABLED",
+    "dataReductionMode" : "disabled",
+    "isAluaEnabled" : false
+  }, {
+    "ldevId" : 1,
+    "clprId" : 0,
+    "emulationType" : "OPEN-V-CVS",
+    "byteFormatCapacity" : "400.00 G",
+    "blockCapacity" : 838860800,
+    "numOfPorts" : 4,
+    "ports" : [ {
+      "portId" : "CL2-B",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 2
+    }, {
+      "portId" : "CL1-B",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 2
+    }, {
+      "portId" : "CL2-A",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 2
+    }, {
+      "portId" : "CL1-A",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 2
+    } ],
+    "attributes" : [ "CVS", "HDP" ],
+    "label" : "vg_test1",
+    "status" : "NML",
+    "mpBladeId" : 1,
+    "ssid" : "0004",
+    "poolId" : 0,
+    "numOfUsedBlock" : 0,
+    "isFullAllocationEnabled" : false,
+    "resourceGroupId" : 0,
+    "dataReductionStatus" : "DISABLED",
+    "dataReductionMode" : "disabled",
+    "isAluaEnabled" : false
+  }, {
+    "ldevId" : 2,
+    "clprId" : 0,
+    "emulationType" : "OPEN-V-CVS",
+    "byteFormatCapacity" : "10.00 T",
+    "blockCapacity" : 21474836480,
+    "numOfPorts" : 52,
+    "ports" : [ {
+      "portId" : "CL2-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 6
+    }, {
+      "portId" : "CL1-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 6
+    }, {
+      "portId" : "CL2-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 6
+    }, {
+      "portId" : "CL1-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 6
+    } ],
+    "attributes" : [ "CVS", "HDP" ],
+    "label" : "vmware_legacy_ssd0",
+    "status" : "NML",
+    "mpBladeId" : 0,
+    "ssid" : "0004",
+    "poolId" : 0,
+    "numOfUsedBlock" : 9604460544,
+    "isFullAllocationEnabled" : false,
+    "resourceGroupId" : 0,
+    "dataReductionStatus" : "DISABLED",
+    "dataReductionMode" : "disabled",
+    "isAluaEnabled" : false
+  }, {
+    "ldevId" : 3,
+    "clprId" : 0,
+    "emulationType" : "OPEN-V-CVS",
+    "byteFormatCapacity" : "10.00 T",
+    "blockCapacity" : 21474836480,
+    "numOfPorts" : 52,
+    "ports" : [ {
+      "portId" : "CL2-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 5
+    }, {
+      "portId" : "CL1-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 5
+    }, {
+      "portId" : "CL2-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 5
+    }, {
+      "portId" : "CL1-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 5
+    } ],
+    "attributes" : [ "CVS", "HDP" ],
+    "label" : "vmware_legacy_ssd1",
+    "status" : "NML",
+    "mpBladeId" : 1,
+    "ssid" : "0004",
+    "poolId" : 0,
+    "numOfUsedBlock" : 7754084352,
+    "isFullAllocationEnabled" : false,
+    "resourceGroupId" : 0,
+    "dataReductionStatus" : "DISABLED",
+    "dataReductionMode" : "disabled",
+    "isAluaEnabled" : false
+  }, {
+    "ldevId" : 4,
+    "clprId" : 0,
+    "emulationType" : "OPEN-V-CVS",
+    "byteFormatCapacity" : "5.00 T",
+    "blockCapacity" : 10737418240,
+    "numOfPorts" : 52,
+    "ports" : [ {
+      "portId" : "CL2-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 4
+    }, {
+      "portId" : "CL1-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 4
+    }, {
+      "portId" : "CL2-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 4
+    }, {
+      "portId" : "CL1-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 4
+    } ],
+    "attributes" : [ "CVS", "HDP" ],
+    "label" : "vmware_legacy_ssd2",
+    "status" : "NML",
+    "mpBladeId" : 0,
+    "ssid" : "0004",
+    "poolId" : 0,
+    "numOfUsedBlock" : 5074944,
+    "isFullAllocationEnabled" : false,
+    "resourceGroupId" : 0,
+    "dataReductionStatus" : "DISABLED",
+    "dataReductionMode" : "disabled",
+    "isAluaEnabled" : false
+  }, {
+    "ldevId" : 5,
+    "clprId" : 0,
+    "emulationType" : "OPEN-V-CVS",
+    "byteFormatCapacity" : "5.00 T",
+    "blockCapacity" : 10737418240,
+    "numOfPorts" : 52,
+    "ports" : [ {
+      "portId" : "CL2-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 3
+    }, {
+      "portId" : "CL1-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 3
+    }, {
+      "portId" : "CL2-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 3
+    }, {
+      "portId" : "CL1-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 3
+    } ],
+    "attributes" : [ "CVS", "HDP" ],
+    "label" : "vmware_legacy_ssd3",
+    "status" : "NML",
+    "mpBladeId" : 1,
+    "ssid" : "0004",
+    "poolId" : 0,
+    "numOfUsedBlock" : 1014042624,
+    "isFullAllocationEnabled" : false,
+    "resourceGroupId" : 0,
+    "dataReductionStatus" : "DISABLED",
+    "dataReductionMode" : "disabled",
+    "isAluaEnabled" : false
+  } ]
+}"""
 if __name__ == "__main__":
     main()
