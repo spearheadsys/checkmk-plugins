@@ -113,13 +113,12 @@ def process_storage_pools ():
     raw_json = get_storage_pools()
     full_data = json.loads(raw_json)
     data = full_data["data"]
-    output("poolID\tpoolType\tpoolName\ttotalPhysicalCapacity\ttotalPoolCapacity\tavailableVolumeCapacity\tusedCapacityRate")
+    output("poolID\tpoolType\tpoolName\ttotalPhysicalCapacity\ttotalPoolCapacity\tavailableVolumeCapacity\tusedCapacityRate\tpoolStatus")
     for pool in data:
-        if pool["poolType"] == "HTI":
-            output("%s\t%s\t%s\t%s\t%s\t%s\t%s" % (pool["poolId"], pool["poolType"], pool["poolName"], \
-                                               pool["totalPhysicalCapacity"], pool["totalPoolCapacity"], \
-                                               pool["availableVolumeCapacity"], pool["usedCapacityRate"]) )
-
+        output("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % (pool["poolId"], pool["poolType"], pool["poolName"],
+                                               pool["totalPhysicalCapacity"], pool["totalPoolCapacity"],
+                                               pool["availableVolumeCapacity"], pool["usedCapacityRate"],
+                                               pool["poolStatus"],))
 
 def process_storage_info():
     output("<<<hitachi_storage_info:sep(9)>>>")
