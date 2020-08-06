@@ -108,6 +108,27 @@ def get_storage_pools():
     url = "https://%(address)s/ConfigurationManager/v1/objects/pools" % args_dict
     return query(url)
 
+
+def get_storage_clprs():
+    if opt_demo:
+        raw_json = storage_clprs
+        return raw_json
+    url = "https://%(address)s/ConfigurationManager/v1/objects/clprs" % args_dict
+    return query(url)
+
+
+def process_storage_clprs():
+    output("<<<hitachi_storage_clprs:sep(9)>>>")
+    raw_json = get_storage_clprs()
+    full_data = json.loads(raw_json)
+    data = full_data["data"]
+    output("clprId\tcacheMemoryCapacity\tcacheMemoryUsedCapacity\twritePendingDataCapacity\t"
+          "writePendingDataCapacity\tcacheUsageRate")
+    for clpr in data:
+        output("%s\t%s\t%s\t%s\t%s" % (clpr["clprId"], clpr["cacheMemoryCapacity"], clpr["cacheMemoryUsedCapacity"],
+                                   clpr["writePendingDataCapacity"], clpr["cacheUsageRate"]))
+
+
 def process_storage_pools ():
     output("<<<hitachi_storage_pools:sep(9)>>>")
     raw_json = get_storage_pools()
@@ -130,7 +151,7 @@ def main():
     try:
         process_storage_info()
         process_storage_pools()
-
+        process_storage_clprs()
         sys.stdout.write("\n".join(output_lines) + "\n")
     except Exception as e:
         sys.stderr.write("Connection error: %s" % e)
@@ -151,6 +172,23 @@ storage_info = """{
  ],
  "isSecure": true
 }"""
+
+storage_clprs="""{
+  "data": [
+    {
+      "clprId": 0,
+      "clprName": "CLPR0",
+      "cacheMemoryCapacity": 924672,
+      "cacheMemoryUsedCapacity": 901454,
+      "writePendingDataCapacity": 44959,
+      "sideFilesCapacity": 0,
+      "cacheUsageRate": 99,
+      "writePendingDataRate": 5,
+      "sideFilesUsageRate": 0
+    }
+  ]
+}"""
+
 
 storage_pools = """
 {
