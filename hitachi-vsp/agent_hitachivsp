@@ -165,7 +165,7 @@ def process_storage_hardware_status():
     for channelboard in channelsboards:
         output("%s\t%s\t%s" % (channelboard["location"], channelboard["status"], channelboard["type"]))
 
-    cacheFlashMemories=full_data["chbs"]
+    cacheFlashMemories=full_data["cacheFlashMemories"]
     output("<<<hitachi_storage_cache_flash_memories:sep(9)>>>")
     output("location\tstatus\ttype")
     for cacheFlashMemory in cacheFlashMemories:
