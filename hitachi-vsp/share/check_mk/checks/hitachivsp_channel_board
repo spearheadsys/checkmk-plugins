@@ -25,12 +25,12 @@
 # Boston, MA 02110-1301 USA.
 
 #example output
-<<<hitachivsp_channel_board:sep(9)>>>
-location	status	type
-CHB-1A	Normal	32G Ready 4Port FC
-CHB-1B	Normal	32G Ready 4Port FC
-CHB-2A	Normal	32G Ready 4Port FC
-CHB-2B	Normal	32G Ready 4Port FC
+#<<<hitachivsp_channel_board:sep(9)>>>
+#location	status	type
+#CHB-1A	Normal	32G Ready 4Port FC
+#CHB-1B	Normal	32G Ready 4Port FC
+#CHB-2A	Normal	32G Ready 4Port FC
+#CHB-2B	Normal	32G Ready 4Port FC
 
 
 def inventory_hitachivsp_channel_board(info):

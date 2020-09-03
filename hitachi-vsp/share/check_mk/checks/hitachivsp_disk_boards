@@ -25,37 +25,36 @@
 # Boston, MA 02110-1301 USA.
 
 #example output
-#<<<hitachivsp_channel_board:sep(9)>>>
+#<<<hitachivsp_disk_boards:sep(9)>>>
 #location	status	type
-#CHB-1A	Normal	32G Ready 4Port FC
-#CHB-1B	Normal	32G Ready 4Port FC
-#CHB-2A	Normal	32G Ready 4Port FC
-#CHB-2B	Normal	32G Ready 4Port FC
+#DKB-1G	Normal	Disk Board
+#DKB-1H	Normal	Disk Board
+#DKB-2G	Normal	Disk Board
+#DKB-2H	Normal	Disk Board
 
-
-def inventory_hitachivsp_cache_flash_memories(info):
+def inventory_hitachivsp_disk_boards(info):
     for line in info:
         if "location" not in line:
             yield line[0], {}
 
 
-def check_hitachivsp_cache_flash_memories(item, params, info):
+def check_hitachivsp_disk_boards(item, params, info):
     for line in info:
         if item == line[0]:
             if line[1] == "Normal":
-                yield 0, "Cache memory status is Normal"
+                yield 0, "Disk Board status is Normal"
             elif line[1] == "Warning":
-                yield 1, "Cache memory status is Warning"
+                yield 1, "Disk Board status is Warning"
             elif line[1] == "Blocked":
-                yield 2, "Cache memory status is Blocked"
+                yield 2, "Disk Board status is Blocked"
             elif line[1] == "Failed":
-                yield 2, "Cache memory status is Failed"
+                yield 2, "Disk Board status is Failed"
 
 
-check_info['hitachivsp_cache_flash_memories'] = {
-    'inventory_function': inventory_hitachivsp_cache_flash_memories,
-    'check_function': check_hitachivsp_cache_flash_memories,
-    'service_description': 'Cache Flash Memory %s',
+check_info['hitachivsp_disk_boards'] = {
+    'inventory_function': inventory_hitachivsp_disk_boards,
+    'check_function': check_hitachivsp_disk_boards,
+    'service_description': 'Disk Board %s',
     'has_perfdata': True
 }
 
