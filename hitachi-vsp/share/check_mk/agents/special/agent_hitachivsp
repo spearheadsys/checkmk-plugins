@@ -28,7 +28,7 @@ import sys
 import getopt
 import pprint
 import json
-#from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 
 def usage():
@@ -91,7 +91,7 @@ def output(line):
 #    if type(line) not in [str]:
 #        output_lines.append(pprint.pprint(line))
 #    else:
-        output_lines.append(line)
+    output_lines.append(line)
 
 
 def get_storage_info():
@@ -125,11 +125,12 @@ def get_storage_ldevs():
     url = "https://%(address)s/ConfigurationManager/v1/objects/ldevs" % args_dict
     return query(url)
 
+
 def get_storage_parity_groups():
     if opt_demo:
         raw_json = storage_parity_groups
         return raw_json
-    url = "https://%(address)s/ConfigurationManager/v1/objects/parity-groups" %args_dict
+    url = "https://%(address)s/ConfigurationManager/v1/objects/parity-groups" % args_dict
     return query(url)
 
 
@@ -137,7 +138,7 @@ def get_storage_hardware_status():
     if opt_demo:
         raw_json = storage_hardware_status
         return raw_json
-    url = "https://%(address)s/ConfigurationManager/v1/objects/components/instance" %args_dict
+    url = "https://%(address)s/ConfigurationManager/v1/objects/components/instance" % args_dict
     return query(url)
 
 
@@ -151,8 +152,8 @@ def process_storage_hardware_status():
     output("<<<hitachi_storage_ctls:sep(9)>>>")
     output("location\tstatus\ttemperature\ttemperatureStatus\tcharge")
     for ctl in ctls:
-        output("%s\t%s\t%s\t%s\t%s" % ( ctl["location"], ctl["status"], ctl["temperature"], ctl["temperatureStatus"],
-                                        ctl["charge"] ))
+        output("%s\t%s\t%s\t%s\t%s" % (ctl["location"], ctl["status"], ctl["temperature"], ctl["temperatureStatus"],
+                                        ctl["charge"]))
 
     cachememories = full_data["cacheMemories"]
     output("<<<hitachivsp_cache_memories:sep(9)>>>")
@@ -160,17 +161,17 @@ def process_storage_hardware_status():
     for cachemem in cachememories:
         output("%s\t%s\t%s" % (cachemem["location"], cachemem["status"], cachemem["cacheSize"]))
 
-    channelsboards=full_data["chbs"]
+    channelsboards = full_data["chbs"]
     output("<<<hitachivsp_channel_board:sep(9)>>>")
     output("location\tstatus\ttype")
     for channelboard in channelsboards:
         output("%s\t%s\t%s" % (channelboard["location"], channelboard["status"], channelboard["type"]))
 
-    cacheFlashMemories=full_data["cacheFlashMemories"]
+    cacheflashmemories = full_data["cacheFlashMemories"]
     output("<<<hitachivsp_cache_flash_memories:sep(9)>>>")
     output("location\tstatus\ttype")
-    for cacheFlashMemory in cacheFlashMemories:
-        output("%s\t%s\t%s" % (cacheFlashMemory["location"], cacheFlashMemory["status"], cacheFlashMemory["type"]))
+    for cacheflashmemory in cacheflashmemories:
+        output("%s\t%s\t%s" % (cacheflashmemory["location"], cacheflashmemory["status"], cacheflashmemory["type"]))
 
     disk_boards = full_data["dkbs"]
     output("<<<hitachivsp_disk_boards:sep(9)>>>")
@@ -182,7 +183,7 @@ def process_storage_hardware_status():
     output("<<<hitachivsp_sfps:sep(9)>>>")
     output("portId\tstatus\ttype\tspeed\tportCondition")
     for sfp in sfps:
-        output("%s\t%s\t%s\t%s\t%s" % (sfp["portId"], sfp["status"], sfp["type"], sfp["speed"], sfp["portCondition"] ))
+        output("%s\t%s\t%s\t%s\t%s" % (sfp["portId"], sfp["status"], sfp["type"], sfp["speed"], sfp["portCondition"]))
 
     backup_modules = full_data["bkmfs"]
     output("<<<hitachivsp_backup_modules:sep(9)>>>")
