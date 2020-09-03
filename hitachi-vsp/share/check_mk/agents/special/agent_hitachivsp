@@ -28,8 +28,8 @@ import sys
 import getopt
 import pprint
 import json
-from requests.packages.urllib3.exceptions import InsecureRequestWarning
-
+import urllib3
+import requests
 
 def usage():
     sys.stderr.write("""Check_MK Hitachi VSP
@@ -57,7 +57,7 @@ except getopt.GetoptError as err:
     sys.exit(1)
 
 
-opt_demo = True
+opt_demo = False
 opt_cert = True
 args_dict = {}
 
@@ -78,9 +78,11 @@ for o,a in opts:
 
 
 def query(url):
-    if opt_cert == False:
-        requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-    response = requests.get(url, auth = (args_dict["username"], args_dict["password"]), verify=opt_cert)
+    if not opt_cert:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    response = requests.get(url,
+                            auth=(args_dict["username"], args_dict["password"]),
+                            verify=opt_cert)
     raw_json = response.text
     return raw_json
 
@@ -253,7 +255,7 @@ def process_storage_clprs():
     full_data = json.loads(raw_json)
     data = full_data["data"]
     output("clprId\tcacheMemoryCapacity\tcacheMemoryUsedCapacity\twritePendingDataCapacity\t"
-          "cacheUsageRate")
+          "writePendingDataCapacity\tcacheUsageRate")
     for clpr in data:
         output("%s\t%s\t%s\t%s\t%s" % (clpr["clprId"], clpr["cacheMemoryCapacity"], clpr["cacheMemoryUsedCapacity"],
                                    clpr["writePendingDataCapacity"], clpr["cacheUsageRate"]))
