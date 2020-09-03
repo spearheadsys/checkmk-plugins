@@ -26,9 +26,9 @@
 
 #example output
 #<<<hitachivsp_pools:sep(9)>>>
-#poolID poolType        poolName        totalPhysicalCapacity   totalPoolCapacity       availableVolumeCapacity usedCapacityRate        poolStatus
-#0      RT      RAID6_HDT_01    397630296       397630296       208964826       47      POLN
-#1      HTI     THIN_IMAGE_POOL 46453344        46453344        46453344        0       POLN
+#poolID	poolType	poolName	totalPhysicalCapacity	totalPoolCapacity	availableVolumeCapacity	usedCapacityRate	poolStatus
+#0	RT	RAID6_HDT_01	397630296	397630296	208964826	47	POLN
+#1	HTI	THIN_IMAGE_POOL	46453344	46453344	46453344	0	POLN
 
 
 def inventory_hitachivsp_pools(info):
@@ -42,18 +42,19 @@ def check_hitachivsp_pools(item, _no_params, info):
         if item == line[0]:
             perf_data = line[6]
             if line[7] == "POLE":
-                yield 2, "Pool is suspended in failure status"
+               yield 2, "Pool is suspended in failure status" 
             elif line[7] == "POLN":
-                yield 0, "Pool is Normal"
+               yield 0, "Pool is Normal"
             elif line[7] == "POLF":
-                yield 2, "Pool is Full"
+               yield 2, "Pool is Full"
             elif line[7] == "POLS":
-                yield 2, "Pool is Suspended"
+               yield 2, "Pool is Suspended"
+            
 
-
+ 
 check_info['hitachivsp_pools'] = {
     'inventory_function': inventory_hitachivsp_pools,
     'check_function': check_hitachivsp_pools,
     'service_description': 'Pool %s',
-    'has_perfdata': False
+    'has_perfdata': False 
 }

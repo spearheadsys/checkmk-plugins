@@ -26,9 +26,9 @@
 
 #example output
 #<<<hitachivsp_ctls:sep(9)>>>
-#location       status  temperature     temperatureStatus       charge
-#CTL1   Normal  23      Normal  100
-#CTL2   Normal  23      Normal  100
+#location	status	temperature	temperatureStatus	charge
+#CTL1	Normal	23	Normal	100
+#CTL2	Normal	23	Normal	100
 
 
 def inventory_hitachivsp_ctls(info):
@@ -55,7 +55,7 @@ def check_hitachivsp_ctls(item, params, info):
                 yield 1, "Temperature Status is Warning: %s" % line[2]
             elif line[3] == "Failed":
                 yield 2, "Temperature Status is Failed: %s" % line[2]
-    
+
 
 check_info['hitachivsp_ctls'] = {
     'inventory_function': inventory_hitachivsp_ctls,
@@ -63,3 +63,4 @@ check_info['hitachivsp_ctls'] = {
     'service_description': '%s',
     'has_perfdata': True
 }
+

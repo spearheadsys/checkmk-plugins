@@ -25,41 +25,37 @@
 # Boston, MA 02110-1301 USA.
 
 #example output
-#<<<hitachivsp_ldevs:sep(9)>>>
-#ldevId	clprId	byteFormatCapacity	blockCapacity	label	status
-#0	0	500.00 G	1048576000	vg_test0	NML
-#1	0	400.00 G	838860800	vg_test1	NML
-#2	0	10.00 T	21474836480	vmware_legacy_ssd0	NML
-#3	0	10.00 T	21474836480	vmware_legacy_ssd1	NML
-#4	0	5.00 T	10737418240	vmware_legacy_ssd2	NML
-#5	0	5.00 T	10737418240	vmware_legacy_ssd3	NML
+#<<<hitachivsp_channel_board:sep(9)>>>
+#location	status	type
+#CHB-1A	Normal	32G Ready 4Port FC
+#CHB-1B	Normal	32G Ready 4Port FC
+#CHB-2A	Normal	32G Ready 4Port FC
+#CHB-2B	Normal	32G Ready 4Port FC
 
 
-def inventory_hitachivsp_ldevs(info):
+def inventory_hitachivsp_cache_flash_memories(info):
     for line in info:
-        if "ldevId" not in line:
+        if "location" not in line:
             yield line[0], {}
 
 
-def check_hitachivsp_ldevs(item, params, info):
+def check_hitachivsp_cache_flash_memories(item, params, info):
     for line in info:
         if item == line[0]:
-           if line[5] == "NML":
-               yield 0, "Ldev is in normal status; byteFormatCapacity: %s ; blockCapacity: %s ; label %s ; \
-                     status %s" % (line[2], line[3], line[4], line[5]) 
-           elif line[5] == "BLK":
-               yield 2, "Ldev is Blocked!!; byteFormatCapacity: %s ; blockCapacity: %s ; label %s ; \
-                     status %s" % (line[2], line[3], line[4], line[5])
-           elif line[5] == "BSY":
-               yield 2, "Ldev status is being changed!!; byteFormatCapacity: %s ; blockCapacity: %s ; label %s ; \
-                     status %s" % (line[2], line[3], line[4], line[5])
-           else:
-               yield 3, "Ldev status is unknown(not supported)"
+            if line[1] == "Normal":
+                yield 0, "Cache memory status is Normal"
+            elif line[1] == "Warning":
+                yield 1, "Cache memory status is Warning"
+            elif line[1] == "Blocked":
+                yield 2, "Cache memory status is Blocked"
+            elif line[1] == "Blocked":
+                yield 2, "Cache memory status is Failed"
 
-check_info['hitachivsp_ldevs'] = {
-    'inventory_function': inventory_hitachivsp_ldevs,
-    'check_function': check_hitachivsp_ldevs,
-    'service_description': 'LDEV %s',
-    'has_perfdata': False
+
+check_info['hitachivsp_cache_flash_memories'] = {
+    'inventory_function': inventory_hitachivsp_cache_flash_memories,
+    'check_function': check_hitachivsp_cache_flash_memories,
+    'service_description': 'Cache Flash Memory %s',
+    'has_perfdata': True
 }
 

@@ -35,8 +35,8 @@ def inventory_hitachivsp_powerConsumption(info):
 
 
 def check_hitachivsp_powerConsumption(item, params, info):
-    yield 0, "Power Consumption: %s " % int(line[1]), \
-                 [("PowerConsumption", int(line[1]), None, None, 0)]
+    yield 0, "Power Consumption: %s " % int(info[0][1]), \
+                 [("PowerConsumption", int(info[0][1]), None, None, 0)]
 
 
 check_info['hitachivsp_powerConsumption'] = {
@@ -45,3 +45,4 @@ check_info['hitachivsp_powerConsumption'] = {
     'service_description': '%s',
     'has_perfdata': True
 }
+

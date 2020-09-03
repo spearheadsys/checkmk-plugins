@@ -52,3 +52,4 @@ check_info['hitachivsp_clprs'] = {
     'service_description': 'CLPR %s',
     'has_perfdata': True
 }
+
