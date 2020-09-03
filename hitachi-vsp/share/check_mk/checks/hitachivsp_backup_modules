@@ -25,51 +25,49 @@
 # Boston, MA 02110-1301 USA.
 
 #example output
-#<<<hitachivsp_sfps:sep(9)>>>
-#portId	status	type	speed	portCondition
-#1A	Normal	Short Wave	16 Gbps	Available (Connected)
-#3A	Normal	Short Wave	16 Gbps	Available (Connected)
-#5A	Normal	Short Wave	16 Gbps	Available (Connected)
-#7A	Normal	Short Wave	16 Gbps	Available (Connected)
-#1B	Normal	Short Wave	16 Gbps	Available (Connected)
-#3B	Normal	Short Wave	16 Gbps	Available (Connected)
-#5B	Normal	Short Wave	16 Gbps	Available (Connected)
-#7B	Normal	Short Wave	16 Gbps	Available (Connected)
-#2A	Normal	Short Wave	16 Gbps	Available (Connected)
-#4A	Normal	Short Wave	16 Gbps	Available (Connected)
-#6A	Normal	Short Wave	16 Gbps	Available (Connected)
-#8A	Normal	Short Wave	16 Gbps	Available (Connected)
-#2B	Normal	Short Wave	16 Gbps	Available (Connected)
-#4B	Normal	Short Wave	16 Gbps	Available (Connected)
-#6B	Normal	Short Wave	16 Gbps	Available (Connected)
-#8B	Normal	Short Wave	16 Gbps	Available (Connected)
+#<<<hitachivsp_backup_modules:sep(9)>>>
+#location	status	bat_location	bat_status	bat_life
+#BKMF-10	Normal			
+#BKMF-11	Normal	BAT-B11	Normal	90
+#BKMF-12	Normal	BAT-B12	Normal	90
+#BKMF-13	Normal	BAT-B13	Normal	90
+#BKMF-20	Normal			
+#BKMF-21	Normal	BAT-B21	Normal	90
+#BKMF-22	Normal	BAT-B22	Normal	90
+#BKMF-23	Normal	BAT-B23	Normal	90
 
-def inventory_hitachivsp_sfps(info):
+def inventory_hitachivsp_backup_modules(info):
     for line in info:
-        if "portId" not in line:
+        if "location" not in line:
             yield line[0], {}
 
 
-def check_hitachivsp_sfps(item, params, info):
+def check_hitachivsp_backup_modules(item, params, info):
     for line in info:
         if item == line[0]:
             if line[1] == "Normal":
-                yield 0, "SFP status is Normal"
+                yield 0, "Backup Module status is Normal"
             elif line[1] == "Warning":
-                yield 1, "SFP status is Warning"
-            elif line[1] == "Not fix":
-                yield 2, "SFP status is Not fix"
-            if line[4] == "Available (Connected)":
-                yield 0, "SFP is Connected"
-            elif line[4] == "Available (Not Connected)":
-                yield 1, "SFP is not Connected"
-            elif line[4] == "Not Available":
-                yield 2, "SFP is not available"
+                yield 1, "Backup Module status is Warning"
+            elif line[1] == "Blocked":
+                yield 2, "Backup Module status is Blocked"
+            elif line[1] == "Failed":
+                yield 2, "Backup Module status is Failed"
+            if len(line) > 2:
+                if line[3] == "Normal":
+                    yield 0, "Battery status is Normal"
+                elif line[3] == "Warning":
+                    yield 1, "Battery status is Warning"
+                elif line[3] == "Blocked":
+                    yield 2, "Battery status is Blocked"
+                elif line[3] == "Failed":
+                    yield 2, "Battery status is Failed"
 
-check_info['hitachivsp_sfps'] = {
-    'inventory_function': inventory_hitachivsp_sfps,
-    'check_function': check_hitachivsp_sfps,
-    'service_description': 'SFP Port %s',
+
+check_info['hitachivsp_backup_modules'] = {
+    'inventory_function': inventory_hitachivsp_backup_modules,
+    'check_function': check_hitachivsp_backup_modules,
+    'service_description': 'Backup Module %s',
     'has_perfdata': False
 }
 
