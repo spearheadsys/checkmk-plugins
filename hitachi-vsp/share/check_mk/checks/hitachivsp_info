@@ -1,0 +1,56 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2020             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# tails. You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+#.
+#   .--general-------------------------------------------------------------.
+#   |                                                  _                   |
+#   |                   __ _  ___ _ __   ___ _ __ __ _| |                  |
+#   |                  / _` |/ _ \ '_ \ / _ \ '__/ _` | |                  |
+#   |                 | (_| |  __/ | | |  __/ | | (_| | |                  |
+#   |                  \__, |\___|_| |_|\___|_|  \__,_|_|                  |
+#   |                  |___/                                               |
+#   +----------------------------------------------------------------------+
+#   |                                                                      |
+#   '----------------------------------------------------------------------'
+
+#example output
+#<<<hitachivsp_info:sep(9)>>>
+#666666 666666666666    88-04-03/00     VSP G700
+
+def inventory_hitachivsp_info():
+    return [(None, None)]
+
+
+def check_hitachivsp_info(item, _no_params, info):
+    return 0, "Model: %s, Serial Number: %s , StorageDeviceID: %s, dkcMicroVersion: %s " % \
+           (info[0][3], info[0][0], info[0][1], info[0][2] )
+
+
+check_info['hitachivsp_info'] = {
+    'inventory_function': inventory_hitachivsp_info,
+    'check_function': check_hitachivsp_info,
+    'service_description': 'Hitachi VSP Info',
+}
