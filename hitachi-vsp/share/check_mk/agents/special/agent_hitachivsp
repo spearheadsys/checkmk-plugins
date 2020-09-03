@@ -253,7 +253,7 @@ def process_storage_clprs():
     full_data = json.loads(raw_json)
     data = full_data["data"]
     output("clprId\tcacheMemoryCapacity\tcacheMemoryUsedCapacity\twritePendingDataCapacity\t"
-          "writePendingDataCapacity\tcacheUsageRate")
+          "cacheUsageRate")
     for clpr in data:
         output("%s\t%s\t%s\t%s\t%s" % (clpr["clprId"], clpr["cacheMemoryCapacity"], clpr["cacheMemoryUsedCapacity"],
                                    clpr["writePendingDataCapacity"], clpr["cacheUsageRate"]))
