@@ -1,7 +1,0 @@
----
-# file: omd.yml
-- hosts: omd
-  #vars:
-  #vars_files:
-  roles:
-    - omd
