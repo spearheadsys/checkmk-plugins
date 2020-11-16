@@ -45,7 +45,7 @@ check_info["exchange_db_size"] = {
     'check_function':        check_exchange_db_size,
     'inventory_function':    inventory_exchange_db_size,
     'service_description':   '%s Database size',
-    'default_levels_variable': 'exchange_user_mbx_size_default_values',
+    'default_levels_variable': 'exchange_db_size_default_values',
     'has_perfdata':          True,
     'group':                 'exchange_db_size',
 }
