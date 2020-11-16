@@ -340,11 +340,11 @@ cluster_xml = \
           </tr>
           <tr>
             <td class="propertyName sysContact">sysContact</td>
-            <td class="propertyValue">backup.ro@orange.com</td>
+            <td class="propertyValue">emailo@example.com</td>
           </tr>
           <tr>
             <td class="propertyName sysLocation">sysLocation</td>
-            <td class="propertyValue">Farm2 - Cluj</td>
+            <td class="propertyValue">RandomLocation</td>
           </tr>
           <tr>
             <td class="propertyName isMixedCluster">isMixedCluster</td>

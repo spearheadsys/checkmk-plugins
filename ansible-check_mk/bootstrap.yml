@@ -1,7 +1,0 @@
----
-# file: bootstrap.yml
-- hosts: all
-  #vars:
-  vars_files: [roles/common/vars/usersandpsks.yml, roles/omd/vars/main.yml]
-  roles:
-    - common

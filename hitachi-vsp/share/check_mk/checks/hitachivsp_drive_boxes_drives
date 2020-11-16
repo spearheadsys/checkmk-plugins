@@ -1,0 +1,90 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2020             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# tails. You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+#example output
+#<<<hitachivsp_drive_boxes_drives:sep(9)>>>
+#drivebox_location	drive_location	drive_status	drive_recomend_Replacement
+#DB-00	HDD00-00	Normal	0
+#DB-00	HDD00-01	Normal	0
+#DB-00	HDD00-02	Normal	0
+#DB-00	HDD00-03	Normal	0
+#DB-00	HDD00-04	Normal	0
+#DB-00	HDD00-05	Normal	0
+#DB-00	HDD00-11	Normal	0
+#DB-01	HDD01-00	Normal	0
+#DB-01	HDD01-01	Normal	0
+#DB-01	HDD01-02	Normal	0
+#DB-01	HDD01-03	Normal	0
+#DB-01	HDD01-04	Normal	0
+#DB-01	HDD01-05	Normal	0
+#DB-02	HDD02-00	Normal	0
+#DB-02	HDD02-01	Normal	0
+#DB-02	HDD02-02	Normal	0
+#DB-02	HDD02-03	Normal	0
+#DB-02	HDD02-04	Normal	0
+#DB-02	HDD02-05	Normal	0
+#DB-03	HDD03-00	Normal	0
+#DB-03	HDD03-01	Normal	0
+#DB-03	HDD03-02	Normal	0
+#DB-03	HDD03-03	Normal	0
+#DB-03	HDD03-04	Normal	0
+#DB-03	HDD03-05	Normal	0
+
+
+def inventory_hitachivsp_drive_boxes_drives(info):
+    for line in info:
+        if "drive_location" not in line:
+            yield line[1], {}
+
+
+def check_hitachivsp_drive_boxes_drives(item, params, info):
+    for line in info:
+        if item == line[1]:
+            if line[2] == "Normal":
+                yield 0, "Drive status is Normal"
+            elif "Warning" in line[2]:
+                yield 1, "Drive status is: %s" % line[2]
+            elif "Copying" in line[2]:
+                yield 1, "Drive status is: %s" % line[2]
+            elif "Pending" in line[2]:
+                yield 1, "Drive status is: %s" % line[2]
+            elif line[2] == "Copy incomplete":
+                yield 2, "Drive status is Copy Incomplete"
+            if line[3] == "1":
+                yield 1, "Drive replacement is recommended"
+            else:
+                yield 0, "Drive replacement is not recommended"
+
+
+
+
+check_info['hitachivsp_drive_boxes_drives'] = {
+    'inventory_function': inventory_hitachivsp_drive_boxes_drives,
+    'check_function': check_hitachivsp_drive_boxes_drives,
+    'service_description': 'Drive %s',
+    'has_perfdata': True
+}
+

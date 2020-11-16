@@ -1,0 +1,6 @@
+# Checkmk active check for Hitachi SVP
+
+Tested on models x, x but according to API should work with VSP G130 G/F350 
+G/F370 G/F700 G/F900 
+
+

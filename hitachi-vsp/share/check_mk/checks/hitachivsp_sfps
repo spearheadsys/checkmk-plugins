@@ -1,0 +1,75 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2020             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# tails. You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+#example output
+#<<<hitachivsp_sfps:sep(9)>>>
+#portId	status	type	speed	portCondition
+#1A	Normal	Short Wave	16 Gbps	Available (Connected)
+#3A	Normal	Short Wave	16 Gbps	Available (Connected)
+#5A	Normal	Short Wave	16 Gbps	Available (Connected)
+#7A	Normal	Short Wave	16 Gbps	Available (Connected)
+#1B	Normal	Short Wave	16 Gbps	Available (Connected)
+#3B	Normal	Short Wave	16 Gbps	Available (Connected)
+#5B	Normal	Short Wave	16 Gbps	Available (Connected)
+#7B	Normal	Short Wave	16 Gbps	Available (Connected)
+#2A	Normal	Short Wave	16 Gbps	Available (Connected)
+#4A	Normal	Short Wave	16 Gbps	Available (Connected)
+#6A	Normal	Short Wave	16 Gbps	Available (Connected)
+#8A	Normal	Short Wave	16 Gbps	Available (Connected)
+#2B	Normal	Short Wave	16 Gbps	Available (Connected)
+#4B	Normal	Short Wave	16 Gbps	Available (Connected)
+#6B	Normal	Short Wave	16 Gbps	Available (Connected)
+#8B	Normal	Short Wave	16 Gbps	Available (Connected)
+
+def inventory_hitachivsp_sfps(info):
+    for line in info:
+        if "portId" not in line:
+            yield line[0], {}
+
+
+def check_hitachivsp_sfps(item, params, info):
+    for line in info:
+        if item == line[0]:
+            if line[1] == "Normal":
+                yield 0, "SFP status is Normal"
+            elif line[1] == "Warning":
+                yield 1, "SFP status is Warning"
+            elif line[1] == "Not fix":
+                yield 2, "SFP status is Not fix"
+            if line[4] == "Available (Connected)":
+                yield 0, "SFP is Connected"
+            elif line[4] == "Available (Not Connected)":
+                yield 1, "SFP is not Connected"
+            elif line[4] == "Not Available":
+                yield 2, "SFP is not available"
+
+check_info['hitachivsp_sfps'] = {
+    'inventory_function': inventory_hitachivsp_sfps,
+    'check_function': check_hitachivsp_sfps,
+    'service_description': 'SFP Port %s',
+    'has_perfdata': False
+}
+

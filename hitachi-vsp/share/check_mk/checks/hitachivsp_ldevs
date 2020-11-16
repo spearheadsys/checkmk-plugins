@@ -1,0 +1,65 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2020             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# tails. You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+#example output
+#<<<hitachivsp_ldevs:sep(9)>>>
+#ldevId	clprId	byteFormatCapacity	blockCapacity	label	status
+#0	0	500.00 G	1048576000	vg_test0	NML
+#1	0	400.00 G	838860800	vg_test1	NML
+#2	0	10.00 T	21474836480	vmware_legacy_ssd0	NML
+#3	0	10.00 T	21474836480	vmware_legacy_ssd1	NML
+#4	0	5.00 T	10737418240	vmware_legacy_ssd2	NML
+#5	0	5.00 T	10737418240	vmware_legacy_ssd3	NML
+
+
+def inventory_hitachivsp_ldevs(info):
+    for line in info:
+        if "ldevId" not in line:
+            yield line[0], {}
+
+
+def check_hitachivsp_ldevs(item, params, info):
+    for line in info:
+        if item == line[0]:
+           if line[5] == "NML":
+               yield 0, "Ldev is in normal status; byteFormatCapacity: %s ; blockCapacity: %s ; label %s ; \
+                     status %s" % (line[2], line[3], line[4], line[5]) 
+           elif line[5] == "BLK":
+               yield 2, "Ldev is Blocked!!; byteFormatCapacity: %s ; blockCapacity: %s ; label %s ; \
+                     status %s" % (line[2], line[3], line[4], line[5])
+           elif line[5] == "BSY":
+               yield 2, "Ldev status is being changed!!; byteFormatCapacity: %s ; blockCapacity: %s ; label %s ; \
+                     status %s" % (line[2], line[3], line[4], line[5])
+           else:
+               yield 3, "Ldev status is unknown(not supported)"
+
+check_info['hitachivsp_ldevs'] = {
+    'inventory_function': inventory_hitachivsp_ldevs,
+    'check_function': check_hitachivsp_ldevs,
+    'service_description': 'LDEV %s',
+    'has_perfdata': False
+}
+

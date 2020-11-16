@@ -1,0 +1,60 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2020             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# tails. You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+#example output
+#<<<hitachivsp_pools:sep(9)>>>
+#poolID	poolType	poolName	totalPhysicalCapacity	totalPoolCapacity	availableVolumeCapacity	usedCapacityRate	poolStatus
+#0	RT	RAID6_HDT_01	397630296	397630296	208964826	47	POLN
+#1	HTI	THIN_IMAGE_POOL	46453344	46453344	46453344	0	POLN
+
+
+def inventory_hitachivsp_pools(info):
+    for line in info:
+        if "totalPhysicalCapacity" not in line:
+            yield line[0], {}
+
+
+def check_hitachivsp_pools(item, _no_params, info):
+    for line in info:
+        if item == line[0]:
+            perf_data = line[6]
+            if line[7] == "POLE":
+               yield 2, "Pool is suspended in failure status" 
+            elif line[7] == "POLN":
+               yield 0, "Pool is Normal"
+            elif line[7] == "POLF":
+               yield 2, "Pool is Full"
+            elif line[7] == "POLS":
+               yield 2, "Pool is Suspended"
+            
+
+ 
+check_info['hitachivsp_pools'] = {
+    'inventory_function': inventory_hitachivsp_pools,
+    'check_function': check_hitachivsp_pools,
+    'service_description': 'Pool %s',
+    'has_perfdata': False 
+}

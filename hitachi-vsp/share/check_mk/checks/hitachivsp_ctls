@@ -1,0 +1,66 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2020             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# tails. You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+#example output
+#<<<hitachivsp_ctls:sep(9)>>>
+#location	status	temperature	temperatureStatus	charge
+#CTL1	Normal	23	Normal	100
+#CTL2	Normal	23	Normal	100
+
+
+def inventory_hitachivsp_ctls(info):
+    for line in info:
+        if "location" not in line:
+            yield line[0], {}
+
+
+def check_hitachivsp_ctls(item, params, info):
+    for line in info:
+        if item == line[0]:
+            if line[1] == "Normal" :
+                yield 0, "Controller status is Normal"
+            elif line[1] == "Warning" :
+                yield 1, "Controller status is Warning"
+            elif line[1] == "Blocked" :
+                yield 2, "Controller status is Blocked"
+            elif line[1] == "Failed" :
+                yield 2, "Controller status is Failed"
+            
+            if line[3] == "Normal" :
+                yield 0, "Temperature Status is Normal: %s" % line[2]
+            elif line[3] == "Warning":
+                yield 1, "Temperature Status is Warning: %s" % line[2]
+            elif line[3] == "Failed":
+                yield 2, "Temperature Status is Failed: %s" % line[2]
+
+
+check_info['hitachivsp_ctls'] = {
+    'inventory_function': inventory_hitachivsp_ctls,
+    'check_function': check_hitachivsp_ctls,
+    'service_description': '%s',
+    'has_perfdata': True
+}
+

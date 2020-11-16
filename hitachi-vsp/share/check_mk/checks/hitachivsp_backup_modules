@@ -1,0 +1,73 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2020             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# tails. You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+#example output
+#<<<hitachivsp_backup_modules:sep(9)>>>
+#location	status	bat_location	bat_status	bat_life
+#BKMF-10	Normal			
+#BKMF-11	Normal	BAT-B11	Normal	90
+#BKMF-12	Normal	BAT-B12	Normal	90
+#BKMF-13	Normal	BAT-B13	Normal	90
+#BKMF-20	Normal			
+#BKMF-21	Normal	BAT-B21	Normal	90
+#BKMF-22	Normal	BAT-B22	Normal	90
+#BKMF-23	Normal	BAT-B23	Normal	90
+
+def inventory_hitachivsp_backup_modules(info):
+    for line in info:
+        if "location" not in line:
+            yield line[0], {}
+
+
+def check_hitachivsp_backup_modules(item, params, info):
+    for line in info:
+        if item == line[0]:
+            if line[1] == "Normal":
+                yield 0, "Backup Module status is Normal"
+            elif line[1] == "Warning":
+                yield 1, "Backup Module status is Warning"
+            elif line[1] == "Blocked":
+                yield 2, "Backup Module status is Blocked"
+            elif line[1] == "Failed":
+                yield 2, "Backup Module status is Failed"
+            if len(line) > 2:
+                if line[3] == "Normal":
+                    yield 0, "Battery status is Normal"
+                elif line[3] == "Warning":
+                    yield 1, "Battery status is Warning"
+                elif line[3] == "Blocked":
+                    yield 2, "Battery status is Blocked"
+                elif line[3] == "Failed":
+                    yield 2, "Battery status is Failed"
+
+
+check_info['hitachivsp_backup_modules'] = {
+    'inventory_function': inventory_hitachivsp_backup_modules,
+    'check_function': check_hitachivsp_backup_modules,
+    'service_description': 'Backup Module %s',
+    'has_perfdata': False
+}
+

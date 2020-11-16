@@ -1,0 +1,1390 @@
+#!/usr/bin/env python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2020             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# tails. You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+import sys
+import getopt
+import pprint
+import json
+import urllib3
+import requests
+
+def usage():
+    sys.stderr.write("""Check_MK Hitachi VSP
+
+USAGE: agent_hitachivsp [OPTIONS] HOST
+
+OPTIONS:
+  -h, --help                    Show this help message and exit
+  --address                     Host address
+  --user                        Username
+  --password                    Password
+  --no-cert-check               Disable certificate check
+""")
+    sys.exit(1)
+
+
+short_options = "h"
+long_options = ["help", "username=", "password=", "address=", "demo", "no-cert-check"]
+
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], short_options, long_options)
+except getopt.GetoptError as err:
+    sys.stderr.write("%s\n" % err)
+    sys.exit(1)
+
+
+opt_demo = False
+opt_cert = True
+args_dict = {}
+
+
+for o,a in opts:
+    if o in [ "--address" ]:
+        args_dict["address"] = a
+    elif o in [ "--username" ]:
+        args_dict["username"] = a
+    elif o in [ "--password" ]:
+        args_dict["password"] = a
+    elif o in [ "--demo" ]:
+        opt_demo = True
+    elif o in [ "--no-cert-check" ]:
+        opt_cert = False
+    elif o in [ "-h", "--help" ]:
+        usage()
+
+
+def query(url):
+    if not opt_cert:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    response = requests.get(url,
+                            auth=(args_dict["username"], args_dict["password"]),
+                            verify=opt_cert)
+    raw_json = response.text
+    return raw_json
+
+
+output_lines = []
+def output(line):
+###this is working correctly only on python3. not needed for python2
+#    if type(line) not in [str]:
+#        output_lines.append(pprint.pprint(line))
+#    else:
+    output_lines.append(line)
+
+
+def get_storage_info():
+    if opt_demo:
+        raw_json = storage_info
+        return raw_json
+    url = "https://%(address)s/ConfigurationManager/v1/objects/storages/instance" % args_dict
+    return query(url)
+
+
+def get_storage_pools():
+    if opt_demo:
+        raw_json = storage_pools
+        return raw_json
+    url = "https://%(address)s/ConfigurationManager/v1/objects/pools" % args_dict
+    return query(url)
+
+
+def get_storage_clprs():
+    if opt_demo:
+        raw_json = storage_clprs
+        return raw_json
+    url = "https://%(address)s/ConfigurationManager/v1/objects/clprs" % args_dict
+    return query(url)
+
+
+def get_storage_ldevs():
+    if opt_demo:
+        raw_json = storage_ldevs
+        return raw_json
+    url = "https://%(address)s/ConfigurationManager/v1/objects/ldevs" % args_dict
+    return query(url)
+
+
+def get_storage_parity_groups():
+    if opt_demo:
+        raw_json = storage_parity_groups
+        return raw_json
+    url = "https://%(address)s/ConfigurationManager/v1/objects/parity-groups" % args_dict
+    return query(url)
+
+
+def get_storage_hardware_status():
+    if opt_demo:
+        raw_json = storage_hardware_status
+        return raw_json
+    url = "https://%(address)s/ConfigurationManager/v1/objects/components/instance" % args_dict
+    return query(url)
+
+
+def process_storage_hardware_status():
+    raw_json = get_storage_hardware_status()
+    full_data = json.loads(raw_json)
+    system = full_data["system"]
+    output("<<<hitachivsp_powerConsumption:sep(9)>>>")
+    output("powerConsumption\t%s" % (system["powerConsumption"]))
+    ctls = full_data["ctls"]
+    output("<<<hitachi_storage_ctls:sep(9)>>>")
+    output("location\tstatus\ttemperature\ttemperatureStatus\tcharge")
+    for ctl in ctls:
+        output("%s\t%s\t%s\t%s\t%s" % (ctl["location"], ctl["status"], ctl["temperature"], ctl["temperatureStatus"],
+                                        ctl["charge"]))
+
+    cachememories = full_data["cacheMemories"]
+    output("<<<hitachivsp_cache_memories:sep(9)>>>")
+    output("location\tstatus\tcacheSize")
+    for cachemem in cachememories:
+        output("%s\t%s\t%s" % (cachemem["location"], cachemem["status"], cachemem["cacheSize"]))
+
+    channelsboards = full_data["chbs"]
+    output("<<<hitachivsp_channel_board:sep(9)>>>")
+    output("location\tstatus\ttype")
+    for channelboard in channelsboards:
+        output("%s\t%s\t%s" % (channelboard["location"], channelboard["status"], channelboard["type"]))
+
+    cacheflashmemories = full_data["cacheFlashMemories"]
+    output("<<<hitachivsp_cache_flash_memories:sep(9)>>>")
+    output("location\tstatus\ttype")
+    for cacheflashmemory in cacheflashmemories:
+        output("%s\t%s\t%s" % (cacheflashmemory["location"], cacheflashmemory["status"], cacheflashmemory["type"]))
+
+    disk_boards = full_data["dkbs"]
+    output("<<<hitachivsp_disk_boards:sep(9)>>>")
+    output("location\tstatus\ttype")
+    for dkb in disk_boards:
+        output("%s\t%s\t%s" % (dkb["location"], dkb["status"], dkb["type"]))
+
+    sfps = full_data["sfps"]
+    output("<<<hitachivsp_sfps:sep(9)>>>")
+    output("portId\tstatus\ttype\tspeed\tportCondition")
+    for sfp in sfps:
+        output("%s\t%s\t%s\t%s\t%s" % (sfp["portId"], sfp["status"], sfp["type"], sfp["speed"], sfp["portCondition"]))
+
+    backup_modules = full_data["bkmfs"]
+    output("<<<hitachivsp_backup_modules:sep(9)>>>")
+    output("location\tstatus\tbat_location\tbat_status\tbat_life")
+    for backup_module in backup_modules:
+        if backup_module["batteries"]:
+            battery = backup_module["batteries"][0]
+            output("%s\t%s\t%s\t%s\t%s" % (backup_module["location"], backup_module["status"],
+                                    battery["location"],
+                                    battery["status"],
+                                    battery["life"]))
+        else:
+            output("%s\t%s\t\t\t" % (backup_module["location"], backup_module["status"]))
+
+    driveboxes = full_data["driveBoxes"]
+    output("<<<hitachivsp_drive_boxes_drives:sep(9)>>>")
+    output("drivebox_location\tdrive_location\tdrive_status\tdrive_recomend_Replacement")
+    for drivebox in driveboxes:
+        drives=drivebox["drives"]
+        for drive in drives:
+            output("%s\t%s\t%s\t%s" % (drivebox["location"], drive["location"], drive["status"],
+                                       drive["recomendReplacement"]))
+
+    output("<<<hitachivsp_drive_boxes_encs:sep(9)>>>")
+    output("drivebox_location\tenc_location\tenc_status")
+    for drivebox in driveboxes:
+        encs=drivebox["encs"]
+        for enc in encs:
+            output("%s\t%s\t%s" % (drivebox["location"], enc["location"], enc["status"] ))
+
+    output("<<<hitachivsp_drive_boxes_dbps:sep(9)>>>")
+    output("drivebox_location\tdbps_location\tdbps_status")
+    for drivebox in driveboxes:
+        dbps=drivebox["dbps"]
+        for power_supply in dbps:
+            output("%s\t%s\t%s" % (drivebox["location"], power_supply["location"], power_supply["status"] ))
+
+def process_storage_parity_groups():
+    output("<<<hitachivsp_parity_groups:sep(9)>>>")
+    raw_json = get_storage_parity_groups()
+    full_data = json.loads(raw_json)
+    data = full_data["data"]
+    output("parityGroupId\tnumOfLdevs\tusedCapacityRate\tclprId\tavailableVolumeCapacity\t"
+          "totalCapacity\tphysicalCapacity")
+    for parity_group in data:
+        output("%s\t%s\t%s\t%s\t%s\t%s\t%s" % (parity_group["parityGroupId"], parity_group["numOfLdevs"],
+                                           parity_group["usedCapacityRate"], parity_group["clprId"],
+                                           parity_group["availableVolumeCapacity"], parity_group["totalCapacity"],
+                                           parity_group["physicalCapacity"] ))
+
+
+def process_storage_ldevs():
+    output("<<<hitachivsp_ldevs:sep(9)>>>")
+    raw_json = get_storage_ldevs()
+    full_data = json.loads(raw_json)
+    data = full_data["data"]
+    output("ldevId\tclprId\tbyteFormatCapacity\tblockCapacity\t"
+          "label\tstatus")
+    for ldev in data:
+        output("%s\t%s\t%s\t%s\t%s\t%s" % (ldev["ldevId"], ldev["clprId"], ldev["byteFormatCapacity"],
+                                   ldev["blockCapacity"], ldev["label"], ldev["status"]))
+
+
+def process_storage_clprs():
+    output("<<<hitachivsp_clprs:sep(9)>>>")
+    raw_json = get_storage_clprs()
+    full_data = json.loads(raw_json)
+    data = full_data["data"]
+    output("clprId\tcacheMemoryCapacity\tcacheMemoryUsedCapacity\twritePendingDataCapacity\t"
+          "writePendingDataCapacity\tcacheUsageRate")
+    for clpr in data:
+        output("%s\t%s\t%s\t%s\t%s" % (clpr["clprId"], clpr["cacheMemoryCapacity"], clpr["cacheMemoryUsedCapacity"],
+                                   clpr["writePendingDataCapacity"], clpr["cacheUsageRate"]))
+
+
+def process_storage_pools ():
+    output("<<<hitachivsp_pools:sep(9)>>>")
+    raw_json = get_storage_pools()
+    full_data = json.loads(raw_json)
+    data = full_data["data"]
+    output("poolID\tpoolType\tpoolName\ttotalPhysicalCapacity\ttotalPoolCapacity\tavailableVolumeCapacity\tusedCapacityRate\tpoolStatus")
+    for pool in data:
+        output("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % (pool["poolId"], pool["poolType"], pool["poolName"],
+                                               pool["totalPhysicalCapacity"], pool["totalPoolCapacity"],
+                                               pool["availableVolumeCapacity"], pool["usedCapacityRate"],
+                                               pool["poolStatus"],))
+
+
+def process_storage_info():
+    output("<<<hitachivsp_info:sep(9)>>>")
+    raw_json = get_storage_info()
+    data = json.loads(raw_json)
+    output("%s\t%s\t%s\t%s" % (data["serialNumber"], data["storageDeviceId"], data["dkcMicroVersion"], data["model"]))
+
+def main():
+    try:
+        process_storage_info()
+        process_storage_pools()
+        process_storage_clprs()
+        process_storage_ldevs()
+        process_storage_parity_groups()
+        process_storage_hardware_status()
+        sys.stdout.write("\n".join(output_lines) + "\n")
+    except Exception as e:
+        sys.stderr.write("Connection error: %s" % e)
+        sys.exit(1)
+
+
+storage_info = """{
+ "storageDeviceId": "666666666666",
+ "model": "VSP G700",
+ "serialNumber": 666666,
+ "ctl1Ip": "192.168.223.69",
+ "ctl2Ip": "192.168.223.70",
+ "dkcMicroVersion": "88-04-03/00",
+ "communicationModes": [
+   {
+     "communicationMode": "lanConnectionMode"
+   }
+ ],
+ "isSecure": true
+}"""
+
+storage_clprs="""{
+  "data": [
+    {
+      "clprId": 0,
+      "clprName": "CLPR0",
+      "cacheMemoryCapacity": 924672,
+      "cacheMemoryUsedCapacity": 901454,
+      "writePendingDataCapacity": 44959,
+      "sideFilesCapacity": 0,
+      "cacheUsageRate": 99,
+      "writePendingDataRate": 5,
+      "sideFilesUsageRate": 0
+    }
+  ]
+}"""
+
+
+storage_hardware_status = """{
+  "system": {
+    "powerConsumption": 1357
+  },
+  "ctls": [
+    {
+      "location": "CTL1",
+      "status": "Normal",
+      "temperature": 23,
+      "temperatureStatus": "Normal",
+      "charge": 100,
+      "type": "-"
+    },
+    {
+      "location": "CTL2",
+      "status": "Normal",
+      "temperature": 23,
+      "temperatureStatus": "Normal",
+      "charge": 100,
+      "type": "-"
+    }
+  ],
+  "cacheMemories": [
+    {
+      "location": "CTL1 CMG0",
+      "status": "Normal",
+      "cacheSize": 256
+    },
+    {
+      "location": "CTL1 CMG1",
+      "status": "Normal",
+      "cacheSize": 256
+    },
+    {
+      "location": "CTL2 CMG0",
+      "status": "Normal",
+      "cacheSize": 256
+    },
+    {
+      "location": "CTL2 CMG1",
+      "status": "Normal",
+      "cacheSize": 256
+    }
+  ],
+  "chbs": [
+    {
+      "location": "CHB-1A",
+      "status": "Normal",
+      "type": "32G Ready 4Port FC"
+    },
+    {
+      "location": "CHB-1B",
+      "status": "Normal",
+      "type": "32G Ready 4Port FC"
+    },
+    {
+      "location": "CHB-2A",
+      "status": "Normal",
+      "type": "32G Ready 4Port FC"
+    },
+    {
+      "location": "CHB-2B",
+      "status": "Normal",
+      "type": "32G Ready 4Port FC"
+    }
+  ],
+  "cacheFlashMemories": [
+    {
+      "location": "CFM-10",
+      "status": "Normal",
+      "type": "BM45"
+    },
+    {
+      "location": "CFM-11",
+      "status": "Normal",
+      "type": "BM45"
+    },
+    {
+      "location": "CFM-20",
+      "status": "Normal",
+      "type": "BM45"
+    },
+    {
+      "location": "CFM-21",
+      "status": "Normal",
+      "type": "BM45"
+    }
+  ],
+  "dkbs": [
+    {
+      "location": "DKB-1G",
+      "status": "Normal",
+      "type": "Disk Board"
+    },
+    {
+      "location": "DKB-1H",
+      "status": "Normal",
+      "type": "Disk Board"
+    },
+    {
+      "location": "DKB-2G",
+      "status": "Normal",
+      "type": "Disk Board"
+    },
+    {
+      "location": "DKB-2H",
+      "status": "Normal",
+      "type": "Disk Board"
+    }
+  ],
+  "lanbs": [
+    {
+      "location": "LAN1",
+      "status": "Normal"
+    },
+    {
+      "location": "LAN2",
+      "status": "Normal"
+    }
+  ],
+  "sfps": [
+    {
+      "portId": "1A",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    },
+    {
+      "portId": "3A",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    },
+    {
+      "portId": "5A",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    },
+    {
+      "portId": "7A",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    },
+    {
+      "portId": "1B",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    },
+    {
+      "portId": "3B",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    },
+    {
+      "portId": "5B",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    },
+    {
+      "portId": "7B",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    },
+    {
+      "portId": "2A",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    },
+    {
+      "portId": "4A",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    },
+    {
+      "portId": "6A",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    },
+    {
+      "portId": "8A",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    },
+    {
+      "portId": "2B",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    },
+    {
+      "portId": "4B",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    },
+    {
+      "portId": "6B",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    },
+    {
+      "portId": "8B",
+      "status": "Normal",
+      "type": "Short Wave",
+      "speed": "16 Gbps",
+      "portCondition": "Available (Connected)"
+    }
+  ],
+  "bkmfs": [
+    {
+      "location": "BKMF-10",
+      "status": "Normal",
+      "batteries": []
+    },
+    {
+      "location": "BKMF-11",
+      "status": "Normal",
+      "batteries": [
+        {
+          "location": "BAT-B11",
+          "status": "Normal",
+          "life": 90
+        }
+      ]
+    },
+    {
+      "location": "BKMF-12",
+      "status": "Normal",
+      "batteries": [
+        {
+          "location": "BAT-B12",
+          "status": "Normal",
+          "life": 90
+        }
+      ]
+    },
+    {
+      "location": "BKMF-13",
+      "status": "Normal",
+      "batteries": [
+        {
+          "location": "BAT-B13",
+          "status": "Normal",
+          "life": 90
+        }
+      ]
+    },
+    {
+      "location": "BKMF-20",
+      "status": "Normal",
+      "batteries": []
+    },
+    {
+      "location": "BKMF-21",
+      "status": "Normal",
+      "batteries": [
+        {
+          "location": "BAT-B21",
+          "status": "Normal",
+          "life": 90
+        }
+      ]
+    },
+    {
+      "location": "BKMF-22",
+      "status": "Normal",
+      "batteries": [
+        {
+          "location": "BAT-B22",
+          "status": "Normal",
+          "life": 90
+        }
+      ]
+    },
+    {
+      "location": "BKMF-23",
+      "status": "Normal",
+      "batteries": [
+        {
+          "location": "BAT-B23",
+          "status": "Normal",
+          "life": 90
+        }
+      ]
+    }
+  ],
+  "dkcpss": [
+    {
+      "location": "DKCPS1",
+      "status": "Normal"
+    },
+    {
+      "location": "DKCPS2",
+      "status": "Normal"
+    }
+  ],
+  "driveBoxes": [
+    {
+      "location": "DB-00",
+      "type": "DBF",
+      "led": "OFF",
+      "drives": [
+        {
+          "location": "HDD00-00",
+          "modelCode": "NFHAJ-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD00-01",
+          "modelCode": "NFHAJ-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD00-02",
+          "modelCode": "NFHAJ-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD00-03",
+          "modelCode": "NFHAJ-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD00-04",
+          "modelCode": "NFHAJ-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD00-05",
+          "modelCode": "NFHAJ-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD00-11",
+          "modelCode": "NFHAJ-Q13RSS",
+          "status": "Normal",
+          "usage": "Spare",
+          "recomendReplacement": 0
+        }
+      ],
+      "encs": [
+        {
+          "location": "ENC00-1",
+          "status": "Normal"
+        },
+        {
+          "location": "ENC00-2",
+          "status": "Normal"
+        }
+      ],
+      "dbps": [
+        {
+          "location": "DBPS00-1",
+          "status": "Normal"
+        },
+        {
+          "location": "DBPS00-2",
+          "status": "Normal"
+        }
+      ]
+    },
+    {
+      "location": "DB-01",
+      "type": "DBF",
+      "led": "OFF",
+      "drives": [
+        {
+          "location": "HDD01-00",
+          "modelCode": "NFHAK-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD01-01",
+          "modelCode": "NFHAK-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD01-02",
+          "modelCode": "NFHAK-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD01-03",
+          "modelCode": "NFHAK-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD01-04",
+          "modelCode": "NFHAK-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD01-05",
+          "modelCode": "NFHAK-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        }
+      ],
+      "encs": [
+        {
+          "location": "ENC01-1",
+          "status": "Normal"
+        },
+        {
+          "location": "ENC01-2",
+          "status": "Normal"
+        }
+      ],
+      "dbps": [
+        {
+          "location": "DBPS01-1",
+          "status": "Normal"
+        },
+        {
+          "location": "DBPS01-2",
+          "status": "Normal"
+        }
+      ]
+    },
+    {
+      "location": "DB-02",
+      "type": "DBF",
+      "led": "OFF",
+      "drives": [
+        {
+          "location": "HDD02-00",
+          "modelCode": "NFHAJ-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD02-01",
+          "modelCode": "NFHAJ-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD02-02",
+          "modelCode": "NFHAJ-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD02-03",
+          "modelCode": "NFHAJ-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD02-04",
+          "modelCode": "NFHAJ-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD02-05",
+          "modelCode": "NFHAJ-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        }
+      ],
+      "encs": [
+        {
+          "location": "ENC02-1",
+          "status": "Normal"
+        },
+        {
+          "location": "ENC02-2",
+          "status": "Normal"
+        }
+      ],
+      "dbps": [
+        {
+          "location": "DBPS02-1",
+          "status": "Normal"
+        },
+        {
+          "location": "DBPS02-2",
+          "status": "Normal"
+        }
+      ]
+    },
+    {
+      "location": "DB-03",
+      "type": "DBF",
+      "led": "OFF",
+      "drives": [
+        {
+          "location": "HDD03-00",
+          "modelCode": "NFHAK-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD03-01",
+          "modelCode": "NFHAK-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD03-02",
+          "modelCode": "NFHAK-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD03-03",
+          "modelCode": "NFHAK-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD03-04",
+          "modelCode": "NFHAK-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        },
+        {
+          "location": "HDD03-05",
+          "modelCode": "NFHAK-Q13RSS",
+          "status": "Normal",
+          "usage": "DATA",
+          "recomendReplacement": 0
+        }
+      ],
+      "encs": [
+        {
+          "location": "ENC03-1",
+          "status": "Normal"
+        },
+        {
+          "location": "ENC03-2",
+          "status": "Normal"
+        }
+      ],
+      "dbps": [
+        {
+          "location": "DBPS03-1",
+          "status": "Normal"
+        },
+        {
+          "location": "DBPS03-2",
+          "status": "Normal"
+        }
+      ]
+    }
+  ],
+  "fans": [],
+  "upsMode": "Standard Mode",
+  "pecbs": [],
+  "chbb": {},
+  "pcps": [],
+  "swpks": [],
+  "chbbfans": [],
+  "chbbpss": []
+}"""
+
+
+storage_pools = """
+{
+  "data" : [ {
+    "poolId" : 0,
+    "poolStatus" : "POLN",
+    "usedCapacityRate" : 47,
+    "usedPhysicalCapacityRate" : 47,
+    "poolName" : "RAID6_HDT_01",
+    "availableVolumeCapacity" : 208964826,
+    "availablePhysicalVolumeCapacity" : 208964826,
+    "totalPoolCapacity" : 397630296,
+    "totalPhysicalCapacity" : 397630296,
+    "numOfLdevs" : 136,
+    "firstLdevId" : 3,
+    "warningThreshold" : 80,
+    "depletionThreshold" : 90,
+    "virtualVolumeCapacityRate" : -1,
+    "isMainframe" : false,
+    "isShrinking" : true,
+    "locatedVolumeCount" : 242,
+    "totalLocatedCapacity" : 234976098,
+    "blockingMode" : "NB",
+    "totalReservedCapacity" : 0,
+    "reservedVolumeCount" : 0,
+    "poolActionMode" : "AUT",
+    "tierOperationStatus" : "MON",
+    "dat" : "VAL",
+    "poolType" : "RT",
+    "monitoringMode" : "CM",
+    "tiers" : [ {
+      "tierNumber" : 1,
+      "tierLevelRange" : "00000001",
+      "tierDeltaRange" : "00000005",
+      "tierUsedCapacity" : 31524696,
+      "tierTotalCapacity" : 37087848,
+      "tablespaceRate" : 10,
+      "performanceRate" : 4,
+      "progressOfReplacing" : 100,
+      "bufferRate" : 5
+    }, {
+      "tierNumber" : 2,
+      "tierLevelRange" : "00000000",
+      "tierDeltaRange" : "00000005",
+      "tierUsedCapacity" : 98679336,
+      "tierTotalCapacity" : 116093208,
+      "tablespaceRate" : 10,
+      "performanceRate" : 12,
+      "progressOfReplacing" : 100,
+      "bufferRate" : 5
+    }, {
+      "tierNumber" : 3,
+      "tierLevelRange" : "00000000",
+      "tierDeltaRange" : "00000000",
+      "tierUsedCapacity" : 58461480,
+      "tierTotalCapacity" : 244449240,
+      "tablespaceRate" : 10,
+      "performanceRate" : 62,
+      "progressOfReplacing" : 100,
+      "bufferRate" : 5
+    } ],
+    "dataReductionAccelerateCompCapacity" : 0,
+    "dataReductionAccelerateCompRate" : 0,
+    "compressionRate" : 0,
+    "dataReductionAccelerateCompIncludingSystemData" : {
+      "isReductionCapacityAvailable" : true,
+      "reductionCapacity" : 0,
+      "isReductionRateAvailable" : true,
+      "reductionRate" : 0
+    },
+    "capacitiesExcludingSystemData" : {
+      "usedVirtualVolumeCapacity" : 386386968576
+    }
+  }, {
+    "poolId" : 1,
+    "poolStatus" : "POLN",
+    "usedCapacityRate" : 0,
+    "usedPhysicalCapacityRate" : 0,
+    "snapshotCount" : 0,
+    "poolName" : "THIN_IMAGE_POOL",
+    "availableVolumeCapacity" : 46453344,
+    "availablePhysicalVolumeCapacity" : 46453344,
+    "totalPoolCapacity" : 46453344,
+    "totalPhysicalCapacity" : 46453344,
+    "numOfLdevs" : 16,
+    "firstLdevId" : 22,
+    "warningThreshold" : 80,
+    "virtualVolumeCapacityRate" : -1,
+    "isMainframe" : false,
+    "isShrinking" : false,
+    "poolType" : "HTI",
+    "dataReductionAccelerateCompCapacity" : 0,
+    "dataReductionAccelerateCompRate" : 0,
+    "compressionRate" : 0,
+    "dataReductionAccelerateCompIncludingSystemData" : {
+      "isReductionCapacityAvailable" : true,
+      "reductionCapacity" : 0,
+      "isReductionRateAvailable" : false
+    },
+    "capacitiesExcludingSystemData" : {
+      "usedVirtualVolumeCapacity" : 0
+    }
+  } ]
+}"""
+
+storage_ldevs = """ {
+  "data" : [ {
+    "ldevId" : 0,
+    "clprId" : 0,
+    "emulationType" : "OPEN-V-CVS",
+    "byteFormatCapacity" : "500.00 G",
+    "blockCapacity" : 1048576000,
+    "numOfPorts" : 4,
+    "ports" : [ {
+      "portId" : "CL2-B",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 1
+    }, {
+      "portId" : "CL1-B",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 1
+    }, {
+      "portId" : "CL2-A",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 1
+    }, {
+      "portId" : "CL1-A",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 1
+    } ],
+    "attributes" : [ "CVS", "HDP" ],
+    "label" : "vg_test0",
+    "status" : "NML",
+    "mpBladeId" : 0,
+    "ssid" : "0004",
+    "poolId" : 0,
+    "numOfUsedBlock" : 0,
+    "isFullAllocationEnabled" : false,
+    "resourceGroupId" : 0,
+    "dataReductionStatus" : "DISABLED",
+    "dataReductionMode" : "disabled",
+    "isAluaEnabled" : false
+  }, {
+    "ldevId" : 1,
+    "clprId" : 0,
+    "emulationType" : "OPEN-V-CVS",
+    "byteFormatCapacity" : "400.00 G",
+    "blockCapacity" : 838860800,
+    "numOfPorts" : 4,
+    "ports" : [ {
+      "portId" : "CL2-B",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 2
+    }, {
+      "portId" : "CL1-B",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 2
+    }, {
+      "portId" : "CL2-A",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 2
+    }, {
+      "portId" : "CL1-A",
+      "hostGroupNumber" : 1,
+      "hostGroupName" : "demosrv.example.com",
+      "lun" : 2
+    } ],
+    "attributes" : [ "CVS", "HDP" ],
+    "label" : "vg_test1",
+    "status" : "NML",
+    "mpBladeId" : 1,
+    "ssid" : "0004",
+    "poolId" : 0,
+    "numOfUsedBlock" : 0,
+    "isFullAllocationEnabled" : false,
+    "resourceGroupId" : 0,
+    "dataReductionStatus" : "DISABLED",
+    "dataReductionMode" : "disabled",
+    "isAluaEnabled" : false
+  }, {
+    "ldevId" : 2,
+    "clprId" : 0,
+    "emulationType" : "OPEN-V-CVS",
+    "byteFormatCapacity" : "10.00 T",
+    "blockCapacity" : 21474836480,
+    "numOfPorts" : 52,
+    "ports" : [ {
+      "portId" : "CL2-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 6
+    }, {
+      "portId" : "CL1-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 6
+    }, {
+      "portId" : "CL2-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 6
+    }, {
+      "portId" : "CL1-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 6
+    } ],
+    "attributes" : [ "CVS", "HDP" ],
+    "label" : "vmware_legacy_ssd0",
+    "status" : "NML",
+    "mpBladeId" : 0,
+    "ssid" : "0004",
+    "poolId" : 0,
+    "numOfUsedBlock" : 9604460544,
+    "isFullAllocationEnabled" : false,
+    "resourceGroupId" : 0,
+    "dataReductionStatus" : "DISABLED",
+    "dataReductionMode" : "disabled",
+    "isAluaEnabled" : false
+  }, {
+    "ldevId" : 3,
+    "clprId" : 0,
+    "emulationType" : "OPEN-V-CVS",
+    "byteFormatCapacity" : "10.00 T",
+    "blockCapacity" : 21474836480,
+    "numOfPorts" : 52,
+    "ports" : [ {
+      "portId" : "CL2-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 5
+    }, {
+      "portId" : "CL1-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 5
+    }, {
+      "portId" : "CL2-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 5
+    }, {
+      "portId" : "CL1-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 5
+    } ],
+    "attributes" : [ "CVS", "HDP" ],
+    "label" : "vmware_legacy_ssd1",
+    "status" : "NML",
+    "mpBladeId" : 1,
+    "ssid" : "0004",
+    "poolId" : 0,
+    "numOfUsedBlock" : 7754084352,
+    "isFullAllocationEnabled" : false,
+    "resourceGroupId" : 0,
+    "dataReductionStatus" : "DISABLED",
+    "dataReductionMode" : "disabled",
+    "isAluaEnabled" : false
+  }, {
+    "ldevId" : 4,
+    "clprId" : 0,
+    "emulationType" : "OPEN-V-CVS",
+    "byteFormatCapacity" : "5.00 T",
+    "blockCapacity" : 10737418240,
+    "numOfPorts" : 52,
+    "ports" : [ {
+      "portId" : "CL2-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 4
+    }, {
+      "portId" : "CL1-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 4
+    }, {
+      "portId" : "CL2-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 4
+    }, {
+      "portId" : "CL1-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 4
+    } ],
+    "attributes" : [ "CVS", "HDP" ],
+    "label" : "vmware_legacy_ssd2",
+    "status" : "NML",
+    "mpBladeId" : 0,
+    "ssid" : "0004",
+    "poolId" : 0,
+    "numOfUsedBlock" : 5074944,
+    "isFullAllocationEnabled" : false,
+    "resourceGroupId" : 0,
+    "dataReductionStatus" : "DISABLED",
+    "dataReductionMode" : "disabled",
+    "isAluaEnabled" : false
+  }, {
+    "ldevId" : 5,
+    "clprId" : 0,
+    "emulationType" : "OPEN-V-CVS",
+    "byteFormatCapacity" : "5.00 T",
+    "blockCapacity" : 10737418240,
+    "numOfPorts" : 52,
+    "ports" : [ {
+      "portId" : "CL2-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 3
+    }, {
+      "portId" : "CL1-B",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 3
+    }, {
+      "portId" : "CL2-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 3
+    }, {
+      "portId" : "CL1-A",
+      "hostGroupNumber" : 2,
+      "hostGroupName" : "demosrv0803",
+      "lun" : 3
+    } ],
+    "attributes" : [ "CVS", "HDP" ],
+    "label" : "vmware_legacy_ssd3",
+    "status" : "NML",
+    "mpBladeId" : 1,
+    "ssid" : "0004",
+    "poolId" : 0,
+    "numOfUsedBlock" : 1014042624,
+    "isFullAllocationEnabled" : false,
+    "resourceGroupId" : 0,
+    "dataReductionStatus" : "DISABLED",
+    "dataReductionMode" : "disabled",
+    "isAluaEnabled" : false
+  } ]
+}"""
+
+storage_parity_groups = """ {
+  "data": [
+    {
+      "parityGroupId": "1-1",
+      "numOfLdevs": 26,
+      "usedCapacityRate": 44,
+      "availableVolumeCapacity": 87245,
+      "raidLevel": "RAID5",
+      "raidType": "3D+1P",
+      "clprId": 0,
+      "driveType": "NFHAF-Q13RSS",
+      "driveTypeName": "SSD(FMC)",
+      "totalCapacity": 157286,
+      "physicalCapacity": 39321,
+      "isAcceleratedCompressionEnabled": true,
+      "availableVolumeCapacityInKB": 91483790592
+    },
+    {
+      "parityGroupId": "1-2",
+      "numOfLdevs": 51,
+      "usedCapacityRate": 93,
+      "availableVolumeCapacity": 10448,
+      "raidLevel": "RAID5",
+      "raidType": "3D+1P",
+      "clprId": 0,
+      "driveType": "NFHAF-Q13RSS",
+      "driveTypeName": "SSD(FMC)",
+      "totalCapacity": 157286,
+      "physicalCapacity": 39321,
+      "isAcceleratedCompressionEnabled": true,
+      "availableVolumeCapacityInKB": 10955611392
+    },
+    {
+      "parityGroupId": "1-3",
+      "numOfLdevs": 25,
+      "usedCapacityRate": 42,
+      "availableVolumeCapacity": 90317,
+      "raidLevel": "RAID5",
+      "raidType": "3D+1P",
+      "clprId": 0,
+      "driveType": "NFHAF-Q13RSS",
+      "driveTypeName": "SSD(FMC)",
+      "totalCapacity": 157286,
+      "physicalCapacity": 39321,
+      "isAcceleratedCompressionEnabled": true,
+      "availableVolumeCapacityInKB": 94704917760
+    },
+    {
+      "parityGroupId": "1-4",
+      "numOfLdevs": 52,
+      "usedCapacityRate": 95,
+      "availableVolumeCapacity": 7376,
+      "raidLevel": "RAID5",
+      "raidType": "3D+1P",
+      "clprId": 0,
+      "driveType": "NFHAF-Q13RSS",
+      "driveTypeName": "SSD(FMC)",
+      "totalCapacity": 157286,
+      "physicalCapacity": 39321,
+      "isAcceleratedCompressionEnabled": true,
+      "availableVolumeCapacityInKB": 7734484224
+    },
+    {
+      "parityGroupId": "1-5",
+      "numOfLdevs": 54,
+      "usedCapacityRate": 99,
+      "availableVolumeCapacity": 1232,
+      "raidLevel": "RAID5",
+      "raidType": "3D+1P",
+      "clprId": 0,
+      "driveType": "NFHAF-Q13RSS",
+      "driveTypeName": "SSD(FMC)",
+      "totalCapacity": 157286,
+      "physicalCapacity": 39321,
+      "isAcceleratedCompressionEnabled": true,
+      "availableVolumeCapacityInKB": 1292229888
+    },
+    {
+      "parityGroupId": "1-6",
+      "numOfLdevs": 25,
+      "usedCapacityRate": 42,
+      "availableVolumeCapacity": 90317,
+      "raidLevel": "RAID5",
+      "raidType": "3D+1P",
+      "clprId": 0,
+      "driveType": "NFHAF-Q13RSS",
+      "driveTypeName": "SSD(FMC)",
+      "totalCapacity": 157286,
+      "physicalCapacity": 39321,
+      "isAcceleratedCompressionEnabled": true,
+      "availableVolumeCapacityInKB": 94704917760
+    }
+  ]
+}"""
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,56 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2020             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# tails. You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+#example output
+#<<<hitachivsp_cache_memories:sep(9)>>>
+#location	status	cacheSize
+#CTL1 CMG0	Normal	256
+#CTL1 CMG1	Normal	256
+#CTL2 CMG0	Normal	256
+#CTL2 CMG1	Normal	256
+
+
+def inventory_hitachivsp_cache_memories(info):
+    for line in info:
+        if "location" not in line:
+            yield line[0], {}
+
+
+def check_hitachivsp_cache_memories(item, params, info):
+    for line in info:
+        if item == line[0]:
+            if line[1] == "Normal":
+                yield 0, "Cache memory status is Normal"
+            elif line[1] == "Warning":
+                yield 1, "Cache memory status is Warning"
+
+check_info['hitachivsp_cache_memories'] = {
+    'inventory_function': inventory_hitachivsp_cache_memories,
+    'check_function': check_hitachivsp_cache_memories,
+    'service_description': 'Cache Memory %s',
+    'has_perfdata': True
+}
+

@@ -1,5 +1,0 @@
----
-- include: bootstrap.yml
-- include: webservers.yml
-- include: loadbalancers.yml
-- include: omd.yml

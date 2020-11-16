@@ -1,0 +1,65 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+# +------------------------------------------------------------------+
+# |             ____ _               _        __  __ _  __           |
+# |            / ___| |__   ___  ___| | __   |  \/  | |/ /           |
+# |           | |   | '_ \ / _ \/ __| |/ /   | |\/| | ' /            |
+# |           | |___| | | |  __/ (__|   <    | |  | | . \            |
+# |            \____|_| |_|\___|\___|_|\_\___|_|  |_|_|\_\           |
+# |                                                                  |
+# | Copyright Mathias Kettner 2020             mk@mathias-kettner.de |
+# +------------------------------------------------------------------+
+#
+# This file is part of Check_MK.
+# The official homepage is at http://mathias-kettner.de/check_mk.
+#
+# check_mk is free software;  you can redistribute it and/or modify it
+# under the  terms of the  GNU General Public License  as published by
+# the Free Software Foundation in version 2.  check_mk is  distributed
+# in the hope that it will be useful, but WITHOUT ANY WARRANTY;  with-
+# out even the implied warranty of  MERCHANTABILITY  or  FITNESS FOR A
+# PARTICULAR PURPOSE. See the  GNU General Public License for more de-
+# tails. You should have  received  a copy of the  GNU  General Public
+# License along with GNU Make; see the file  COPYING.  If  not,  write
+# to the Free Software Foundation, Inc., 51 Franklin St,  Fifth Floor,
+# Boston, MA 02110-1301 USA.
+
+#example output
+#<<<hitachivsp_drive_boxes_encs:sep(9)>>>
+#drivebox_location	enc_location	enc_status
+#DB-00	ENC00-1	Normal
+#DB-00	ENC00-2	Normal
+#DB-01	ENC01-1	Normal
+#DB-01	ENC01-2	Normal
+#DB-02	ENC02-1	Normal
+#DB-02	ENC02-2	Normal
+#DB-03	ENC03-1	Normal
+#DB-03	ENC03-2	Normal
+
+def inventory_hitachivsp_drive_boxes_encs(info):
+    for line in info:
+        if "enc_location" not in line:
+            yield line[1], {}
+
+
+def check_hitachivsp_drive_boxes_encs(item, params, info):
+    for line in info:
+        if "enc_location" not in line:
+            if item == line[1]:
+                if line[2] == "Normal":
+                    yield 0, "Drive Enclosure status is Normal"
+                elif line[2] == "Warning":
+                    yield 1, "Drive Enclosure status is Warning"
+                elif line[2] == "Blocked":
+                    yield 2, "Drive Enclosure status is Blocked"
+                elif line[2] == "Failed":
+                    yield 2, "Drive Enclosure status is Failed"
+
+
+check_info['hitachivsp_drive_boxes_encs'] = {
+    'inventory_function': inventory_hitachivsp_drive_boxes_encs,
+    'check_function': check_hitachivsp_drive_boxes_encs,
+    'service_description': 'Drive box enclosure %s',
+    'has_perfdata': True
+}
+
