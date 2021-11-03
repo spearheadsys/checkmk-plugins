@@ -22,11 +22,11 @@ perc_used=`echo "${mem_used} / ${mem_total} * 100" | bc -l | cut -c1-4`
 # hardoced warn/crit at 80/90 percent of total ram used
 if [[ ${perc_used} > 90 ]] 
 then
-  echo -e "2 lx-mem mem_total=${mem_total};;;mem_avail=${mem_avail};;;|mem_used=${mem_used};%;;|mem_free=${mem_free};;;|swap-total=${swap_total};;;|swap_used=${swap_used};;;|swap_free=${swap_free} lx zone memory ${mem_used} of ${mem_total}"
+  echo -e "2 lx-mem mem_total=${mem_total};;;|mem_avail=${mem_avail};;;|mem_used=${mem_used};%;;|mem_free=${mem_free};;;|swap-total=${swap_total};;;|swap_used=${swap_used};;;|swap_free=${swap_free} lx zone memory ${mem_used} of ${mem_total}"
   
 elif [[ ${perc_used} > 80 ]]
 then
-  echo -e "1 lx-mem mem_total=${mem_total};;;mem_avail=${mem_avail};;;|mem_used=${mem_used};;;|mem_free=${mem_free};;;|swap-total=${swap_total};;;|swap_used=${swap_used};;;|swap_free=${swap_free} lx zone memory usage ${mem_used} of ${mem_total}"
+  echo -e "1 lx-mem mem_total=${mem_total};;;|mem_avail=${mem_avail};;;|mem_used=${mem_used};;;|mem_free=${mem_free};;;|swap-total=${swap_total};;;|swap_used=${swap_used};;;|swap_free=${swap_free} lx zone memory usage ${mem_used} of ${mem_total}"
 else
-  echo -e "0 lx-mem mem_total=${mem_total};;;mem_avail=${mem_avail};;;|mem_used=${mem_used};;;|mem_free=${mem_free};;;|swap_total=${swap_total};;;|swap_used=${swap_used};;;|swap_free=${swap_free} lx zone memory usage ${mem_used} of ${mem_total}"
+  echo -e "0 lx-mem mem_total=${mem_total};;;|mem_avail=${mem_avail};;;|mem_used=${mem_used};;;|mem_free=${mem_free};;;|swap_total=${swap_total};;;|swap_used=${swap_used};;;|swap_free=${swap_free} lx zone memory usage ${mem_used} of ${mem_total}"
 fi
