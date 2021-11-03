@@ -1,0 +1,32 @@
+#!/bin/bash
+#
+# warn = 80%, crit 90%
+
+mem_av=`cat /proc/meminfo | grep MemAvailable | awk '{print $2}'`
+mem_avail=`echo "${mem_av} * 1000" | bc -l`
+mem_fr=`cat /proc/meminfo | grep MemFree | awk '{print $2}'`
+mem_free=`echo "${mem_fr} * 1000" | bc -l`
+mem_tot=`cat /proc/meminfo | grep MemTotal | awk '{print $2}'`
+mem_total=`echo "${mem_tot} * 1000" | bc -l`
+mem_used=`echo "${mem_total} - ${mem_free}" | bc -l`
+
+#used=`free -b | grep 'Mem' | awk '{print $3 }'`
+
+# swap is generally useless on lx branded zones unless using swap files, in which 
+# case they become important and this check does nothing for them ... todo
+swap_used=`free -b | grep 'Swap' | awk '{print $3 }'`
+swap_free=`free -b | grep 'Swap' | awk '{print $4 }'`
+swap_total=`free -b | grep 'Swap' | awk '{print $2 }'`
+perc_used=`echo "${mem_used} / ${mem_total} * 100" | bc -l | cut -c1-4`
+
+# hardoced warn/crit at 80/90 percent of total ram used
+if [[ ${perc_used} > 90 ]] 
+then
+  echo -e "2 lx-mem mem_total=${mem_total};;;mem_avail=${mem_avail};;;|mem_used=${mem_used};%;;|mem_free=${mem_free};;;|swap-total=${swap_total};;;|swap_used=${swap_used};;;|swap_free=${swap_free} lx zone memory ${mem_used} of ${mem_total}"
+  
+elif [[ ${perc_used} > 80 ]]
+then
+  echo -e "1 lx-mem mem_total=${mem_total};;;mem_avail=${mem_avail};;;|mem_used=${mem_used};;;|mem_free=${mem_free};;;|swap-total=${swap_total};;;|swap_used=${swap_used};;;|swap_free=${swap_free} lx zone memory usage ${mem_used} of ${mem_total}"
+else
+  echo -e "0 lx-mem mem_total=${mem_total};;;mem_avail=${mem_avail};;;|mem_used=${mem_used};;;|mem_free=${mem_free};;;|swap_total=${swap_total};;;|swap_used=${swap_used};;;|swap_free=${swap_free} lx zone memory usage ${mem_used} of ${mem_total}"
+fi
