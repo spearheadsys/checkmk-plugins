@@ -33,24 +33,22 @@ def inventory_infoblox_aat5_latency(info):
     yield item, {}
 
 def check_infoblox_aat5_latency(item, params, info):
-    print item
     latency=int(info[0][0])
-    print params
     if params:
         warn, crit = params['infoblox_latency']
     else:
-	warn, crit = (50, 100)
+        warn, crit = (50, 100)
     state = 0
     latency_info = ""
     if latency > warn:
         if latency > crit:
             state = 2
-            latency_info = "(crit above %s)" % crit
+            latency_info = "Latency is %s ms (crit above %s ms)" % (latency, crit)
         else:
             state = 1
-            latency_info = "(warn above %s)" % warn
+            latency_info = "Latency is %s ms (warn above %s ms)" % (latency, warn)
     else:
-        latency_info = "Latency is %s" % latency
+        latency_info = "Latency is %s ms" % latency
     yield state, latency_info, [('Latency', latency, warn, crit)]          
 
 check_info['infoblox_aat5_latency'] = {

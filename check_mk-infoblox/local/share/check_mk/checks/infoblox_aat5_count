@@ -37,18 +37,18 @@ def check_infoblox_aat5_count(item, params, info):
     if params:
         warn, crit = params['infoblox_count']
     else:
-	warn, crit = (50, 100)
+        warn, crit = (50, 100)
     state = 0
     count_info = ""
     if count > warn:
         if count > crit:
             state = 2
-            count_info = "(crit above %s)" % crit
+            count_info = "Number of AAT5 Requests is %s (crit above %s requests)" % (count, crit)
         else:
             state = 1
-            count_info = "(warn above %s)" % warn
+            count_info = "Number of AAT5 Requests is %s (warn above %s requests)" % (count, warn)
     else:
-        count_info = "Count is is %s" % count
+        count_info = "Number of AAT5 Requests is %s" % count
     yield state, count_info, [('Count', count, warn, crit)]          
 
 check_info['infoblox_aat5_count'] = {
